@@ -13,7 +13,7 @@ let createReleaseDir (path: string) =
     printfn "basedir = %s" baseDir
     // Second path needs to be relative, ot it iss returned as result.....
     let absoluteDirPath = Path.Combine(baseDir, Path.GetRelativePath("/", path))
-    printfn "absolute file path = %s" absoluteDirPath
+    printfn "absolute dir path = %s" absoluteDirPath
 
     if Directory.Exists absoluteDirPath then
         printfn "Directory exists, returning None to stop further processing"
@@ -25,6 +25,7 @@ let createReleaseDir (path: string) =
 let downloadChecksums (checksumsUri: Uri) destinationDir =
     let filename = checksumsUri.Segments |> Array.last
     let filePath = Path.Combine(destinationDir, filename)
+    printfn "downloading %s" (checksumsUri.ToString())
     get (checksumsUri.ToString()) |> Request.send |> Response.saveFile filePath
     filePath
 
@@ -33,18 +34,9 @@ let client = new GitHubClient(new ProductHeaderValue("my-testing-app"))
 client.Credentials <- tokenAuth
 
 
-let downloadLast (username: string) (repo: string) =
+let downloadIndividualChecksumsFile (lastUri: Uri) (downloadSegments: string array) (filename: string) =
     async {
-        printfn "Running downloadLast for %s/%s" username repo
-        let! releases = client.Repository.Release.GetAll(username, repo) |> Async.AwaitTask
-        let last = releases |> Seq.head
-        let lastUri = System.Uri(last.HtmlUrl)
-        let lastPath = lastUri.AbsolutePath
-
-        let downloadSegments =
-            lastUri.Segments |> Array.map (fun s -> if s = "tag/" then "download/" else s)
-
-        let checksumsSegments = Array.append downloadSegments [| "checksums.txt" |]
+        let checksumsSegments = Array.append downloadSegments [| filename |]
         let checksumsPath = Path.Join(checksumsSegments)
         let checksumsUri = System.Uri(lastUri, checksumsPath)
 
@@ -61,6 +53,23 @@ let downloadLast (username: string) (repo: string) =
 
     }
 
+let downloadLastChecksums (username: string) (repo: string) (checksums: string list) =
+    async {
+        printfn "Running downloadLast for %s/%s" username repo
+        let! releases = client.Repository.Release.GetAll(username, repo) |> Async.AwaitTask
+        let last = releases |> Seq.head
+        let lastUri = System.Uri(last.HtmlUrl)
+
+        let downloadSegments =
+            lastUri.Segments |> Array.map (fun s -> if s = "tag/" then "download/" else s)
+
+        return!
+            checksums
+            |> List.map (fun name -> downloadIndividualChecksumsFile lastUri downloadSegments name)
+            |> Async.Parallel
+
+    }
+
 type RepoKind =
     | Github
     | Gitlab
@@ -69,7 +78,7 @@ type Repo =
     { kind: RepoKind
       user: string
       repo: string
-      checksum: string }
+      checksums: string list }
 
 let main () =
     async {
@@ -77,13 +86,16 @@ let main () =
             [ { kind = Github
                 user = "jesseduffield"
                 repo = "lazygit"
-                checksum = "checksums.txt" }
+                checksums = [ "checksums.txt" ] }
               { kind = Github
                 user = "jdx"
                 repo = "mise"
-                checksum = "SHASUMS256.txt" } ]
+                checksums = [ "SHASUMS256.txt"; "SHASUMS512.txt" ] } ]
 
-        return! repos |> List.map (fun r -> downloadLast r.user r.repo) |> Async.Parallel
+        return!
+            repos
+            |> List.map (fun r -> downloadLastChecksums r.user r.repo r.checksums)
+            |> Async.Parallel
 
 
     }
