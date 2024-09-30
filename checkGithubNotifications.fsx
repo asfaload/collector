@@ -9,10 +9,8 @@ open FsHttp
 open FSharp.Data
 open DiskQueue
 
-let releasingReposQueue = new PersistentQueue("queues/releasing_repos")
-let qSession = releasingReposQueue.OpenSession()
 
-let handleRelease (hoster: string) (user: string) (repo: string) =
+let handleRelease (qSession: IPersistentQueueSession) (hoster: string) (user: string) (repo: string) =
     printfn "registering release %s://%s/%s" hoster user repo
 
     qSession.Enqueue(
@@ -20,10 +18,21 @@ let handleRelease (hoster: string) (user: string) (repo: string) =
         |> System.Text.Encoding.ASCII.GetBytes
     )
 
+
+let releasesHandler (qSession: IPersistentQueueSession) (json: System.Text.Json.JsonElement) =
+
+
+    for release in (json.EnumerateArray()) do
+        let user = (release?repository?owner?login.ToString())
+        let repo = (release?repository?name.ToString())
+        handleRelease qSession "github" user repo
+
     qSession.Flush()
 
-let rec getNotifications (lastModified: DateTimeOffset option) =
+let rec getNotifications (lastModified: DateTimeOffset option) (releasesHandler: System.Text.Json.JsonElement -> unit) =
     async {
+
+        printfn "Start call at %A" DateTime.Now
 
         let! response =
             http {
@@ -54,6 +63,7 @@ let rec getNotifications (lastModified: DateTimeOffset option) =
                 |> Option.map ((*) 1000)
                 |> Option.defaultValue 60000
             )
+            |> Async.StartAsTask
 
         if response.statusCode = Net.HttpStatusCode.NotModified then
             printfn "Not modified"
@@ -69,12 +79,11 @@ let rec getNotifications (lastModified: DateTimeOffset option) =
 
             let s = response |> Response.toText
             let json = System.Text.Json.JsonDocument.Parse(s)
-            let user = (json.RootElement[0]?repository?owner?login.ToString())
-            let repo = (json.RootElement[0]?repository?name.ToString())
-            handleRelease "github" user repo
+            releasesHandler json.RootElement
             // Now wait until poll interval is passed
-            do! sleeper
-            return! getNotifications lastModified
+            printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
+            do! sleeper |> Async.AwaitTask
+            return! getNotifications lastModified releasesHandler
         else
             failwithf "Unexpected response status code %A" (response.statusCode)
             return Unchecked.defaultof<_>
@@ -82,9 +91,12 @@ let rec getNotifications (lastModified: DateTimeOffset option) =
 
 let main () =
     async {
-        let! _ = getNotifications (None)
-        return 0
 
+        // Define queue
+        use releasingReposQueue = new PersistentQueue("queues/releasing_repos")
+        let qSession = releasingReposQueue.OpenSession()
+        let! _ = getNotifications (None) (releasesHandler qSession)
+        return 0
     }
 
 main () |> Async.RunSynchronously
