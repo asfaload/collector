@@ -23,23 +23,26 @@ let getNotifications () =
             |> Request.sendAsync
 
         let headers = response.headers
-        printfn "%A" headers
         printfn "ETag = %A" headers.ETag
         let pollInterval = headers.GetValues("X-Poll-Interval") |> Seq.tryHead
         printfn "pollInterval = %A" pollInterval
-        let lastModified = response.content.Headers.LastModified
+
+        let lastModified =
+            response.content.Headers.LastModified
+            |> (fun n -> if n.HasValue then (Some n.Value) else None)
+
         printfn "lastModified = %A" lastModified
         let s = response |> Response.toText
         File.WriteAllText("notifications.json", s)
         let json = System.Text.Json.JsonDocument.Parse(s)
-        return json
+        return pollInterval, lastModified, json
     }
 
 let getNotificationsFromDisk () =
     async {
         let t = File.ReadAllText("notifications.json")
         let json = System.Text.Json.JsonDocument.Parse(t)
-        return json
+        return Some 60, None, json
     }
 
 
@@ -47,8 +50,15 @@ let getNotificationsFromDisk () =
 
 let main () =
     async {
-        let! json = getNotifications ()
-        //let! json = getNotificationsFromDisk ()
+        //let! (Some 60, None, json) = getNotificationsFromDisk ()
+        let! pollInterval, lastModified, json = getNotifications ()
+
+        let nextPollAt =
+            pollInterval
+            |> Option.map (fun interval -> DateTime.Now + TimeSpan.FromSeconds(float interval))
+
+        nextPollAt |> Option.iter (fun pollAt -> printfn "next poll at: %A" pollAt)
+
         let user = (json.RootElement[0]?repository?owner?login.ToString())
         let repo = (json.RootElement[0]?repository?name.ToString())
         printfn "New release for %s/%s" user repo
