@@ -56,7 +56,8 @@ let downloadIndividualChecksumsFile (lastUri: Uri) (downloadSegments: string arr
 let downloadLastChecksums (username: string) (repo: string) (checksums: string list) =
     async {
         printfn "Running downloadLast for %s/%s" username repo
-        let! releases = client.Repository.Release.GetAll(username, repo) |> Async.AwaitTask
+        let options = new ApiOptions(PageSize = 3, PageCount = 1)
+        let! releases = client.Repository.Release.GetAll(username, repo, options) |> Async.AwaitTask
         let last = releases |> Seq.head
         let lastUri = System.Uri(last.HtmlUrl)
 
