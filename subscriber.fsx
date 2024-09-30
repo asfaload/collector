@@ -10,9 +10,11 @@
 // pwsh bin/Debug/net8.0/playwright.ps1 install
 
 open System
+open System.IO
 
 open Microsoft.Playwright
 
+let browserStatePath = "private/auth/state.json"
 let fromEnv = Environment.GetEnvironmentVariable
 
 let subscribeTo (page: IPage) (username: string) (repo: string) =
@@ -53,13 +55,17 @@ let firefoxPage () =
     task {
         printfn "starting browser"
         let! browser = firefoxAsync ()
-        printfn "setting page"
-        let! page = browser.NewPageAsync()
-        printfn "got page"
-        return page
+
+        // The browser state initialisation is awkward. We do it ourselves if no state was found.
+        if not (File.Exists(browserStatePath)) then
+            File.WriteAllText(browserStatePath, """{"cookies":[],"origins":[]}""")
+
+        let! context = browser.NewContextAsync(BrowserNewContextOptions(StorageStatePath = browserStatePath))
+        let! page = context.NewPageAsync()
+        return page, context
     }
 
-let login (page: IPage) =
+let login (context: IBrowserContext) (page: IPage) =
     task {
         let! _response = page.GotoAsync("https://github.com/login")
         // Interact with login form
@@ -76,13 +82,33 @@ let login (page: IPage) =
                 .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Sign in", Exact = true))
                 .ClickAsync()
 
+        // This saves the contect to disk, what a weird api....
+        let! state = context.StorageStateAsync(BrowserContextStorageStateOptions(Path = "private/auth/state.json"))
         return page
+    }
+
+// Checks if user is logged in. Changes url of the page!
+let isLoggedIn (page: IPage) =
+    task {
+        let! _response = page.GotoAsync("https://github.com/")
+        //return! page.Locator("strong").GetByText(("Dashboard")).IsVisibleAsync()
+        return!
+            page
+                .GetByRole(AriaRole.Heading, PageGetByRoleOptions(Name = "Dashboard"))
+                .IsVisibleAsync()
     }
 
 let main () =
     task {
-        let! page = firefoxPage ()
-        let! _ = login page
+        let! page, context = firefoxPage ()
+
+        match! isLoggedIn (page) with
+        | true -> printfn "logged in!"
+        | false ->
+            printfn "logging in"
+            let! _ = login context page
+            ()
+
         let! b = subscribeTo page "rbauduin" "TestRepo"
         return 0
     }
