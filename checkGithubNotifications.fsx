@@ -1,14 +1,28 @@
 #r "nuget: FsHttp"
 #r "nuget: FsHttp"
 #r "nuget: Fsharp.Data"
+#r "nuget: DiskQueue, 1.7.1"
 
 open System
 open System.IO
 open FsHttp
 open FSharp.Data
+open DiskQueue
 
+let releasingReposQueue = new PersistentQueue("queues/releasing_repos")
+let qSession = releasingReposQueue.OpenSession()
 
-let getNotifications (lastModified: DateTimeOffset option) =
+let handleRelease (hoster: string) (user: string) (repo: string) =
+    printfn "registering release %s://%s/%s" hoster user repo
+
+    qSession.Enqueue(
+        $"{{ hoster : {hoster}, user: {user}, repo: {repo} }}"
+        |> System.Text.Encoding.ASCII.GetBytes
+    )
+
+    qSession.Flush()
+
+let rec getNotifications (lastModified: DateTimeOffset option) =
     async {
 
         let! response =
@@ -30,55 +44,45 @@ let getNotifications (lastModified: DateTimeOffset option) =
             |> Request.sendAsync
 
         let headers = response.headers
-        printfn "ETag = %A" headers.ETag
         let pollInterval = headers.GetValues("X-Poll-Interval") |> Seq.tryHead
         printfn "pollInterval = %A" pollInterval
+        // An async sleeper we will wait after we do our work
+        let sleeper =
+            Async.Sleep(
+                pollInterval
+                |> Option.map int
+                |> Option.map ((*) 1000)
+                |> Option.defaultValue 60000
+            )
 
         if response.statusCode = Net.HttpStatusCode.NotModified then
             printfn "Not modified"
-            return pollInterval, lastModified, System.Text.Json.JsonDocument.Parse("[]")
         else if response.statusCode = Net.HttpStatusCode.OK then
             let lastModified =
                 response.content.Headers.LastModified
                 |> (fun n -> if n.HasValue then (Some n.Value) else None)
 
-            printfn "lastModified = %A" lastModified
+
+            let nextPollAt =
+                pollInterval
+                |> Option.map (fun interval -> DateTime.Now + TimeSpan.FromSeconds(float interval))
+
             let s = response |> Response.toText
-            File.WriteAllText("notifications.json", s)
             let json = System.Text.Json.JsonDocument.Parse(s)
-            return pollInterval, lastModified, json
+            let user = (json.RootElement[0]?repository?owner?login.ToString())
+            let repo = (json.RootElement[0]?repository?name.ToString())
+            handleRelease "github" user repo
+            // Now wait until poll interval is passed
+            do! sleeper
+            return! getNotifications lastModified
         else
             failwithf "Unexpected response status code %A" (response.statusCode)
-            return pollInterval, lastModified, System.Text.Json.JsonDocument.Parse("[]")
+            return Unchecked.defaultof<_>
     }
-
-let getNotificationsFromDisk () =
-    async {
-        let t = File.ReadAllText("notifications.json")
-        let json = System.Text.Json.JsonDocument.Parse(t)
-        return Some 60, None, json
-    }
-
-
-
 
 let main () =
     async {
-        //let! (Some 60, None, json) = getNotificationsFromDisk ()
-        let! pollInterval, lastModified, json = getNotifications (None)
-
-        let nextPollAt =
-            pollInterval
-            |> Option.map (fun interval -> DateTime.Now + TimeSpan.FromSeconds(float interval))
-
-        nextPollAt |> Option.iter (fun pollAt -> printfn "next poll at: %A" pollAt)
-
-        let user = (json.RootElement[0]?repository?owner?login.ToString())
-        let repo = (json.RootElement[0]?repository?name.ToString())
-        printfn "New release for %s/%s" user repo
-
-        do! Async.Sleep(TimeSpan.FromSeconds(float (pollInterval |> Option.defaultValue "60")))
-        let! pollInterval, lastModified, json = getNotifications (lastModified)
+        let! _ = getNotifications (None)
         return 0
 
     }
