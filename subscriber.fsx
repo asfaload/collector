@@ -46,12 +46,27 @@ let subscribeTo (page: IPage) (username: string) (repo: string) =
 
     }
 
-let login () =
+let firefoxAsync () =
     task {
-        use! playwright = Playwright.CreateAsync()
+        let! playwright = Playwright.CreateAsync()
         let firefox = playwright.Firefox
         let! browser = firefox.LaunchAsync(BrowserTypeLaunchOptions(Headless = false))
+        return browser
+
+    }
+
+let firefoxPage () =
+    task {
+        printfn "starting browser"
+        let! browser = firefoxAsync ()
+        printfn "setting page"
         let! page = browser.NewPageAsync()
+        printfn "got page"
+        return page
+    }
+
+let login (page: IPage) =
+    task {
         let! _response = page.GotoAsync("https://github.com/login")
         // Interact with login form
         do!
@@ -68,17 +83,18 @@ let login () =
                 .ClickAsync()
 
         Console.ReadLine() |> ignore
-        //return! subscribeTo page "jesseduffield" "lazygit"
-        return true
+        return page
     }
 
 let main () =
-    async {
-        let! _ = login () |> Async.AwaitTask
+    task {
+        let! page = firefoxPage ()
+        let! _ = login page
+        let! b = subscribeTo page "rbauduin" "TestRepo"
         return 0
     }
 
-main () |> Async.RunSynchronously
+main () |> Async.AwaitTask |> Async.RunSynchronously
 ////  The REST API only allows to subsribe to all events, not only releases :-(
 //open FsHttp
 //let user = "jesseduffield"
