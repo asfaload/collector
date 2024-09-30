@@ -19,23 +19,17 @@ let subscribeTo (page: IPage) (username: string) (repo: string) =
     task {
         let! _response = page.GotoAsync($"https://github.com/{username}/{repo}")
 
-        Console.ReadLine() |> ignore
-
         do!
             page
                 .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Watch"))
                 .ClickAsync()
 
-        Console.ReadLine() |> ignore
         do! page.GetByText("Custom", PageGetByTextOptions(Exact = true)).ClickAsync()
-        Console.ReadLine() |> ignore
 
         do!
             page
                 .GetByRole(AriaRole.Checkbox, PageGetByRoleOptions(Name = "Releases", Exact = true))
                 .CheckAsync()
-
-        Console.ReadLine() |> ignore
 
         do!
             page
@@ -82,7 +76,6 @@ let login (page: IPage) =
                 .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Sign in", Exact = true))
                 .ClickAsync()
 
-        Console.ReadLine() |> ignore
         return page
     }
 
