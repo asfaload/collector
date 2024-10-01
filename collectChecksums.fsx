@@ -34,10 +34,11 @@ let CHECKSUMS =
 // Returns Some only if the directory was created.
 // If the directory existed or in case of error, returns None
 let createReleaseDir (path: string) =
+    printfn "createReleaseDir got path %s" path
     let baseDir = Environment.GetEnvironmentVariable("BASE_DIR")
     printfn "basedir = %s" baseDir
-    // Second path needs to be relative, ot it iss returned as result.....
-    let absoluteDirPath = Path.Combine(baseDir, Path.GetRelativePath("/", path))
+    // Second path needs to be relative, or it iss returned as result.....
+    let absoluteDirPath = Path.Combine(baseDir, path)
     printfn "absolute dir path = %s" absoluteDirPath
 
     if Directory.Exists absoluteDirPath then
@@ -67,6 +68,10 @@ let downloadIndividualChecksumsFile (lastUri: Uri) (downloadSegments: string arr
 
         let resultingOption =
             downloadSegments
+            // Remove leading "/" segment, as it caused trouble when calling Path.GetRelativePath
+            |> Array.filter (fun s -> s <> "/")
+            // Set the hostname as first segment
+            |> Array.append [| lastUri.Host |]
             |> Path.Combine
             |> createReleaseDir
             |> Option.map (downloadChecksums checksumsUri)
