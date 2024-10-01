@@ -1,10 +1,29 @@
 #r "nuget: Octokit, 13.0.1"
 #r "nuget: FsHttp"
+#r "nuget: Fsharp.Data"
+#r "nuget: FsHttp.FSharpData, 14.5.1"
 
 open Octokit
 open System
 open System.IO
 open FsHttp
+open FSharp.Data
+open FsHttp.FSharpData
+open FSharp.Data.JsonExtensions
+
+
+
+let CHECKSUMS =
+    [ "checksum.txt"
+      "checksums.txt"
+      "SHA256SUMS"
+      "SHA256SUMS.txt"
+      "SHA512SUMS"
+      "SHA512SUMS.txt"
+      "SHASUMS256"
+      "SHASUMS256.txt"
+      "SHASUMS512.txt"
+      "SHASUMS512" ]
 
 // Returns Some only if the directory was created.
 // If the directory existed or in case of error, returns None
@@ -53,12 +72,19 @@ let downloadIndividualChecksumsFile (lastUri: Uri) (downloadSegments: string arr
 
     }
 
-let downloadLastChecksums (username: string) (repo: string) (checksums: string list) =
+let getLastGithubRelease (username: string) (repo: string) =
     async {
-        printfn "Running downloadLast for %s/%s" username repo
         let options = new ApiOptions(PageSize = 3, PageCount = 1)
         let! releases = client.Repository.Release.GetAll(username, repo, options) |> Async.AwaitTask
         let last = releases |> Seq.head
+        return last
+
+    }
+
+let downloadLastChecksums (username: string) (repo: string) (checksums: string list) =
+    async {
+        printfn "Running downloadLast for %s/%s" username repo
+        let! last = getLastGithubRelease username repo
         let lastUri = System.Uri(last.HtmlUrl)
 
         let downloadSegments =
@@ -81,21 +107,56 @@ type Repo =
       repo: string
       checksums: string list }
 
+let updateChecksumsNames (repo: Repo) =
+    async {
+        let! lastRelease = getLastGithubRelease repo.user repo.repo
+        let releaseId = lastRelease.Id
+
+        let! response =
+            http {
+                GET $"https://api.github.com/repos/{repo.user}/{repo.repo}/releases/{releaseId}/assets"
+                Accept "application/vnd.github+json"
+                UserAgent "rbauduin-test"
+                //AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
+                header "X-GitHub-Api-Version" "2022-11-28"
+            //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
+            }
+            |> Request.sendAsync
+
+        let json = response |> Response.toJson
+
+        let checksumsFiles =
+            json.AsArray()
+            |> Array.filter (fun a -> CHECKSUMS |> List.contains (a?name.AsString()))
+            |> Array.map (fun a -> a?name.AsString())
+            |> Array.toList
+
+        printfn "found checksums files %A" checksumsFiles
+
+        return { repo with checksums = checksumsFiles }
+    }
+
+
 let main () =
     async {
         let repos =
             [ { kind = Github
                 user = "jesseduffield"
                 repo = "lazygit"
-                checksums = [ "checksums.txt" ] }
+                checksums = [] }
               { kind = Github
                 user = "jdx"
                 repo = "mise"
-                checksums = [ "SHASUMS256.txt"; "SHASUMS512.txt" ] } ]
+                checksums = [] } ]
+
+        printfn "number of repos: %d" (repos |> List.length)
+
+        let! updatedRepos = repos |> List.map (fun r -> updateChecksumsNames r) |> Async.Parallel
+
 
         return!
-            repos
-            |> List.map (fun r -> downloadLastChecksums r.user r.repo r.checksums)
+            updatedRepos
+            |> Array.map (fun r -> downloadLastChecksums r.user r.repo r.checksums)
             |> Async.Parallel
 
 
