@@ -1,3 +1,4 @@
+#load "lib/Shared.fsx"
 #r "nuget: Octokit, 13.0.1"
 #r "nuget: FsHttp"
 #r "nuget: Fsharp.Data"
@@ -10,6 +11,7 @@ open FsHttp
 open FSharp.Data
 open FsHttp.FSharpData
 open FSharp.Data.JsonExtensions
+open Asfaload.Collector
 
 
 
@@ -96,16 +98,6 @@ let downloadLastChecksums (username: string) (repo: string) (checksums: string l
             |> Async.Parallel
 
     }
-
-type RepoKind =
-    | Github
-    | Gitlab
-
-type Repo =
-    { kind: RepoKind
-      user: string
-      repo: string
-      checksums: string list }
 
 let updateChecksumsNames (repo: Repo) =
     async {
