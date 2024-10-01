@@ -52,9 +52,21 @@ let rec getNotifications (lastModified: DateTimeOffset option) (releasesHandler:
             }
             |> Request.sendAsync
 
+        printfn "response code %A" response.statusCode
         let headers = response.headers
-        let pollInterval = headers.GetValues("X-Poll-Interval") |> Seq.tryHead
+
+        let pollInterval =
+            try
+                headers.GetValues("X-Poll-Interval") |> Seq.tryHead
+            with _e ->
+                Some "60"
+
         printfn "pollInterval = %A" pollInterval
+
+        let nextPollAt =
+            pollInterval
+            |> Option.map (fun interval -> DateTime.Now + TimeSpan.FromSeconds(float interval))
+
         // An async sleeper we will wait after we do our work
         let sleeper =
             Async.Sleep(
@@ -67,15 +79,14 @@ let rec getNotifications (lastModified: DateTimeOffset option) (releasesHandler:
 
         if response.statusCode = Net.HttpStatusCode.NotModified then
             printfn "Not modified"
+            printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
+            do! sleeper |> Async.AwaitTask
+            return! getNotifications lastModified releasesHandler
         else if response.statusCode = Net.HttpStatusCode.OK then
             let lastModified =
                 response.content.Headers.LastModified
                 |> (fun n -> if n.HasValue then (Some n.Value) else None)
 
-
-            let nextPollAt =
-                pollInterval
-                |> Option.map (fun interval -> DateTime.Now + TimeSpan.FromSeconds(float interval))
 
             let s = response |> Response.toText
             let json = System.Text.Json.JsonDocument.Parse(s)
