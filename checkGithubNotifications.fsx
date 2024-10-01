@@ -20,8 +20,13 @@ let handleRelease (qSession: IPersistentQueueSession) (repo: Repo) =
     qSession.Enqueue(repo |> JsonSerializer.Serialize |> System.Text.Encoding.ASCII.GetBytes)
 
 
-let releasesHandler (qSession: IPersistentQueueSession) (json: System.Text.Json.JsonElement) =
+let releasesHandler (queueName: string) (json: System.Text.Json.JsonElement) =
 
+    // Define queue
+    use releasingReposQueue =
+        PersistentQueue.WaitFor(queueName, TimeSpan.FromSeconds(10))
+
+    use qSession = releasingReposQueue.OpenSession()
 
     for release in (json.EnumerateArray()) do
         let user = (release?repository?owner?login.ToString())
@@ -111,12 +116,8 @@ let rec getNotifications (lastModified: DateTimeOffset option) (releasesHandler:
 let main () =
     async {
 
-        // Define queue
-        use releasingReposQueue =
-            PersistentQueue.WaitFor("queues/releasing_repos", TimeSpan.FromSeconds(10))
 
-        let qSession = releasingReposQueue.OpenSession()
-        let! _ = getNotifications (None) (releasesHandler qSession)
+        let! _ = getNotifications (None) (releasesHandler "queues/releasing_repos")
         return 0
     }
 

@@ -133,34 +133,51 @@ let updateChecksumsNames (repo: Repo) =
     }
 
 
-let main () =
+let handleRepoRelease (qSession: IPersistentQueueSession) (repo: Repo) =
     async {
-        let releasingReposQueue =
-            PersistentQueue.WaitFor("queues/releasing_repos", TimeSpan.FromSeconds(3))
+        let! updatedRepos = [ repo ] |> List.map (fun r -> updateChecksumsNames r) |> Async.Parallel
+
+        let! _ =
+            updatedRepos
+            |> Array.map (fun r -> downloadLastChecksums r.user r.repo r.checksums)
+            |> Async.Parallel
+
+        qSession.Flush()
+
+    }
+
+let rec readQueue (queue: string) =
+    async {
+        let releasingReposQueue = PersistentQueue.WaitFor(queue, TimeSpan.FromSeconds(3))
 
         let qSession = releasingReposQueue.OpenSession()
 
         let repo =
             qSession.Dequeue()
-            |> System.Text.Encoding.ASCII.GetString
-            |> JsonSerializer.Deserialize<Repo>
+            |> Option.ofObj
+            |> Option.map System.Text.Encoding.ASCII.GetString
+            |> Option.map JsonSerializer.Deserialize<Repo>
 
-        qSession.Flush()
-        printfn "repo = %A" repo
+        match repo with
+        | None ->
+            qSession.Dispose()
+            releasingReposQueue.Dispose()
+            printfn "Nothing in queue, will sleep 1s"
+            do! Async.Sleep 1000
+            return! readQueue queue
+        | Some repo ->
+            printfn "repo = %A" repo
+            do! handleRepoRelease qSession repo
+            qSession.Dispose()
+            releasingReposQueue.Dispose()
+            return! readQueue queue
 
+    }
 
-        let! updatedRepos = [ repo ] |> List.map (fun r -> updateChecksumsNames r) |> Async.Parallel
-
-
-        qSession.Dispose()
-        releasingReposQueue.Dispose()
-
-        return!
-            updatedRepos
-            |> Array.map (fun r -> downloadLastChecksums r.user r.repo r.checksums)
-            |> Async.Parallel
-
-
+let main () =
+    async {
+        let! _ = readQueue "queues/releasing_repos"
+        return 0
     }
 
 main () |> Async.RunSynchronously
