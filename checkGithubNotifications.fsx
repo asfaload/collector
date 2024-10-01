@@ -104,7 +104,9 @@ let main () =
     async {
 
         // Define queue
-        use releasingReposQueue = new PersistentQueue("queues/releasing_repos")
+        use releasingReposQueue =
+            PersistentQueue.WaitFor("queues/releasing_repos", TimeSpan.FromSeconds(10))
+
         let qSession = releasingReposQueue.OpenSession()
         let! _ = getNotifications (None) (releasesHandler qSession)
         return 0
