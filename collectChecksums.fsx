@@ -5,6 +5,7 @@
 #r "nuget: Fsharp.Data"
 #r "nuget: FsHttp.FSharpData, 14.5.1"
 #r "nuget: FSharp.SystemTextJson, 1.3.13"
+#r "nuget: Fli, 1.111.10"
 
 open Octokit
 open System
@@ -16,6 +17,7 @@ open FSharp.Data.JsonExtensions
 open Asfaload.Collector
 open DiskQueue
 open System.Text.Json
+open Fli
 
 
 
@@ -30,6 +32,30 @@ let CHECKSUMS =
       "SHASUMS256.txt"
       "SHASUMS512.txt"
       "SHASUMS512" ]
+
+let gitCommit (subject: string) =
+
+    cli {
+        Exec "git"
+        Arguments [ "commit"; "-m"; subject ]
+        WorkingDirectory(Environment.GetEnvironmentVariable "BASE_DIR")
+    }
+    |> Command.execute
+    |> Output.throwIfErrored
+
+let gitAdd (path: string) =
+    printfn "running git add %s" path
+
+    cli {
+        Exec "git"
+        Arguments [ "add"; path ]
+        WorkingDirectory(Environment.GetEnvironmentVariable "BASE_DIR")
+    }
+    |> Command.execute
+    |> Output.throwIfErrored
+    |> ignore
+
+    path
 
 // Returns Some only if the directory was created.
 // If the directory existed or in case of error, returns None
@@ -55,7 +81,9 @@ let downloadChecksums (checksumsUri: Uri) destinationDir =
     get (checksumsUri.ToString()) |> Request.send |> Response.saveFile filePath
     filePath
 
-let tokenAuth = new Credentials(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
+let tokenAuth =
+    new Octokit.Credentials(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
+
 let client = new GitHubClient(new ProductHeaderValue("my-testing-app"))
 client.Credentials <- tokenAuth
 
@@ -75,11 +103,14 @@ let downloadIndividualChecksumsFile (lastUri: Uri) (downloadSegments: string arr
             |> Path.Combine
             |> createReleaseDir
             |> Option.map (downloadChecksums checksumsUri)
+            |> Option.map gitAdd
 
 
         match resultingOption with
         | Some path -> printfn "New checksums file downloaded at %s" path
         | None -> printfn "No download took place"
+
+        return resultingOption
 
     }
 
@@ -142,11 +173,18 @@ let handleRepoRelease (qSession: IPersistentQueueSession) (repo: Repo) =
     async {
         let! updatedRepos = [ repo ] |> List.map (fun r -> updateChecksumsNames r) |> Async.Parallel
 
-        let! _ =
+        let! options =
             updatedRepos
             |> Array.map (fun r -> downloadLastChecksums r.user r.repo r.checksums)
             |> Async.Parallel
 
+        let optionsArray = options |> Array.reduce Array.append
+
+        // If we downloaded a new checksums file, we need to commit
+        if optionsArray |> Array.exists (fun o -> o.IsSome) then
+            gitCommit $"{repo.kind.ToString()}://{repo.user}/{repo.repo}" |> ignore
+
+        // Only flush if all went well
         qSession.Flush()
 
     }
