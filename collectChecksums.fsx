@@ -1,8 +1,10 @@
+#r "nuget: DiskQueue, 1.7.1"
 #load "lib/Shared.fsx"
 #r "nuget: Octokit, 13.0.1"
 #r "nuget: FsHttp"
 #r "nuget: Fsharp.Data"
 #r "nuget: FsHttp.FSharpData, 14.5.1"
+#r "nuget: FSharp.SystemTextJson, 1.3.13"
 
 open Octokit
 open System
@@ -12,6 +14,8 @@ open FSharp.Data
 open FsHttp.FSharpData
 open FSharp.Data.JsonExtensions
 open Asfaload.Collector
+open DiskQueue
+open System.Text.Json
 
 
 
@@ -131,20 +135,25 @@ let updateChecksumsNames (repo: Repo) =
 
 let main () =
     async {
-        let repos =
-            [ { kind = Github
-                user = "jesseduffield"
-                repo = "lazygit"
-                checksums = [] }
-              { kind = Github
-                user = "jdx"
-                repo = "mise"
-                checksums = [] } ]
+        let releasingReposQueue =
+            PersistentQueue.WaitFor("queues/releasing_repos", TimeSpan.FromSeconds(3))
 
-        printfn "number of repos: %d" (repos |> List.length)
+        let qSession = releasingReposQueue.OpenSession()
 
-        let! updatedRepos = repos |> List.map (fun r -> updateChecksumsNames r) |> Async.Parallel
+        let repo =
+            qSession.Dequeue()
+            |> System.Text.Encoding.ASCII.GetString
+            |> JsonSerializer.Deserialize<Repo>
 
+        qSession.Flush()
+        printfn "repo = %A" repo
+
+
+        let! updatedRepos = [ repo ] |> List.map (fun r -> updateChecksumsNames r) |> Async.Parallel
+
+
+        qSession.Dispose()
+        releasingReposQueue.Dispose()
 
         return!
             updatedRepos

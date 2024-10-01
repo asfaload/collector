@@ -1,22 +1,23 @@
+#load "lib/Shared.fsx"
 #r "nuget: FsHttp"
 #r "nuget: FsHttp"
 #r "nuget: Fsharp.Data"
 #r "nuget: DiskQueue, 1.7.1"
+#r "nuget: FSharp.SystemTextJson, 1.3.13"
 
 open System
 open System.IO
 open FsHttp
 open FSharp.Data
 open DiskQueue
+open Asfaload.Collector
+open System.Text.Json
 
 
-let handleRelease (qSession: IPersistentQueueSession) (hoster: string) (user: string) (repo: string) =
-    printfn "registering release %s://%s/%s" hoster user repo
+let handleRelease (qSession: IPersistentQueueSession) (repo: Repo) =
+    printfn "registering release %A://%s/%s" repo.kind repo.user repo.repo
 
-    qSession.Enqueue(
-        $"{{ hoster : {hoster}, user: {user}, repo: {repo} }}"
-        |> System.Text.Encoding.ASCII.GetBytes
-    )
+    qSession.Enqueue(repo |> JsonSerializer.Serialize |> System.Text.Encoding.ASCII.GetBytes)
 
 
 let releasesHandler (qSession: IPersistentQueueSession) (json: System.Text.Json.JsonElement) =
@@ -25,7 +26,14 @@ let releasesHandler (qSession: IPersistentQueueSession) (json: System.Text.Json.
     for release in (json.EnumerateArray()) do
         let user = (release?repository?owner?login.ToString())
         let repo = (release?repository?name.ToString())
-        handleRelease qSession "github" user repo
+
+        let repo =
+            { user = user
+              repo = repo
+              kind = Github
+              checksums = [] }
+
+        handleRelease qSession repo
 
     qSession.Flush()
 
