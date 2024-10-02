@@ -22,7 +22,9 @@ let handleRelease (qSession: IPersistentQueueSession) (repo: Repo) =
 
 let releasesHandler (queueName: string) (json: System.Text.Json.JsonElement) =
 
-    // Define queue
+    // Access and lock queue
+    // As we `use` is, it gets disposed when becoming out of scope.
+    // We cannot keep it open, because it would prevent other processes to access it.
     use releasingReposQueue =
         PersistentQueue.WaitFor(queueName, TimeSpan.FromSeconds(10))
 

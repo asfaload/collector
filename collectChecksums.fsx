@@ -191,6 +191,7 @@ let handleRepoRelease (qSession: IPersistentQueueSession) (repo: Repo) =
 
 let rec readQueue (queue: string) =
     async {
+        // This will wait until the queue can be locked.
         let releasingReposQueue = PersistentQueue.WaitFor(queue, TimeSpan.FromSeconds(3))
 
         let qSession = releasingReposQueue.OpenSession()
@@ -204,6 +205,7 @@ let rec readQueue (queue: string) =
         match repo with
         | None ->
             qSession.Dispose()
+            // Release the queue so writer can access it
             releasingReposQueue.Dispose()
             printfn "Nothing in queue, will sleep 1s"
             do! Async.Sleep 1000
@@ -212,6 +214,7 @@ let rec readQueue (queue: string) =
             printfn "repo = %A" repo
             do! handleRepoRelease qSession repo
             qSession.Dispose()
+            // Release the queue so writer can access it
             releasingReposQueue.Dispose()
             return! readQueue queue
 
