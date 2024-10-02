@@ -103,17 +103,8 @@ let isLoggedIn (page: IPage) =
                 .IsVisibleAsync()
     }
 
-let main () =
-    task {
-        let! page, context = firefoxPage ()
-
-        match! isLoggedIn (page) with
-        | true -> printfn "logged in!"
-        | false ->
-            printfn "logging in"
-            let! _ = login context page
-            ()
-
+let rec subscriptionLoop (page: IPage) =
+    async {
         let! unsubscribedRepos = Repos.getUnsubscribedRepos () |> Repos.run
 
         let! _r =
@@ -125,6 +116,26 @@ let main () =
             unsubscribedRepos
             |> List.map (fun r -> Repos.setSubscribed r |> Repos.run)
             |> Async.Sequential
+
+        printfn "%A Sleeping before next subscription loop" DateTime.Now
+        do! Async.Sleep 5000
+        return! subscriptionLoop page
+
+    }
+
+let main () =
+    task {
+        let! page, context = firefoxPage ()
+
+        match! isLoggedIn (page) with
+        | true -> printfn "logged in!"
+        | false ->
+            printfn "logging in"
+            let! _ = login context page
+            ()
+
+        let! _r = subscriptionLoop page
+
 
         return 0
     }
@@ -145,5 +156,7 @@ main () |> Async.AwaitTask |> Async.RunSynchronously
 //    body
 //    json """{"subscribed":true,"ignored":false}"""
 //
+//}
+//|> Request.send
 //}
 //|> Request.send
