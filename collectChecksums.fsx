@@ -23,6 +23,7 @@ open FSharp.Data.JsonExtensions
 open Asfaload.Collector
 open DiskQueue
 open System.Text.Json
+open System.Text.RegularExpressions
 open Fli
 
 
@@ -37,7 +38,9 @@ let CHECKSUMS =
       "SHASUMS256"
       "SHASUMS256.txt"
       "SHASUMS512.txt"
-      "SHASUMS512" ]
+      "SHASUMS512"
+      // Neovim's approach:
+      ".*\.sha256sum" ]
 
 let gitCommit (subject: string) =
 
@@ -165,7 +168,11 @@ let updateChecksumsNames (repo: Repo) =
 
         let checksumsFiles =
             json.AsArray()
-            |> Array.filter (fun a -> CHECKSUMS |> List.contains (a?name.AsString()))
+            |> Array.filter (fun a ->
+                CHECKSUMS
+                |> List.exists (fun chk ->
+                    let regex = Regex(chk)
+                    regex.IsMatch(a?name.AsString())))
             |> Array.map (fun a -> a?name.AsString())
             |> Array.toList
 
