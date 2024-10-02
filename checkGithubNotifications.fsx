@@ -1,3 +1,11 @@
+// Script that will look at all notifications from github.
+// It loops continually, waiting for the poll interval sent by github
+// to expire before the next iteration.
+// It uses the Last-Modified headers to request only new notifications. When no
+// change is available, a Not Modified response is returned by github, and it doesn't
+// count regarding the requests quota.
+// When a new release is available, it sends it on the DiskQueue for another script to
+// collect the checksums of the release.
 #load "lib/Shared.fsx"
 #r "nuget: FsHttp"
 #r "nuget: FsHttp"

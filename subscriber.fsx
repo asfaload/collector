@@ -1,3 +1,7 @@
+// Script to subscribe to new releases of projects. It loops and looks in the table repos
+// in the sqlite database $REPOS_DB for entries with subscribed=false.
+// It uses Playwright to subsribe via the web interface, as it is the only way
+// to subscribe to only releases notifications.
 #r "nuget: FsHttp"
 #r "nuget: Microsoft.Playwright, 1.47.0"
 #r "nuget: FSharp.SystemTextJson, 1.3.13"

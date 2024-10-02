@@ -1,3 +1,9 @@
+// Script to collect checksums from new releases registered on the DiskQueue by the script
+// looking for new notifications.
+// It downloads the checksums under a directory hierarchy mimicking the source repo's path to the checksums file,
+// including the host, under $BASE_DIR, which needs to be a git repo.
+// It looks for checksums files in the release artifacts according to pre-defined patterns.
+// When the checksums of a release have been downloaded, a new commit is registered.
 #r "nuget: DiskQueue, 1.7.1"
 #load "lib/Shared.fsx"
 #r "nuget: Octokit, 13.0.1"

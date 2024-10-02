@@ -1,3 +1,4 @@
+// Modules defining access to sqlite databases.
 #r "nuget: DbFun.Core, 1.1.0"
 #r "nuget: System.Data.SQLite, 1.0.119"
 #load "Shared.fsx"
