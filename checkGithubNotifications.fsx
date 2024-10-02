@@ -14,6 +14,9 @@ open Asfaload.Collector
 open System.Text.Json
 
 
+let last_modified_file =
+    Environment.GetEnvironmentVariable("NOTIFICATIONS_LAST_MODIFIED_FILE")
+
 let handleRelease (qSession: IPersistentQueueSession) (repo: Repo) =
     printfn "registering release %A://%s/%s" repo.kind repo.user repo.repo
 
@@ -101,8 +104,29 @@ let rec getNotifications (lastModified: DateTimeOffset option) (releasesHandler:
             let lastModified =
                 response.content.Headers.LastModified
                 |> (fun n -> if n.HasValue then (Some n.Value) else None)
+                |> function
+                    | Some v ->
+                        // Register last modified time we saw
+                        v
+                        |> JsonSerializer.Serialize
+                        |> (fun json ->
+                            printfn "registering most recent last-modified"
+                            File.WriteAllText(last_modified_file, json))
+
+                        Some v
+                    // This should not happen as the reponse is supposed to have the last-modified
+                    // header. However, just in case, we handle the situation of a response without it.
+                    | None ->
+                        // If the file exists, it contains the last-modified value for the
+                        // most recent notification we handled.
+                        if File.Exists(last_modified_file) then
+                            printfn "Using last modified from file when request didn't send any"
+                            Some(File.ReadAllText last_modified_file |> JsonSerializer.Deserialize)
+                        else
+                            None
 
 
+            printfn "Last-modified = %A" lastModified
             let s = response |> Response.toText
             let json = System.Text.Json.JsonDocument.Parse(s)
             releasesHandler json.RootElement
@@ -118,8 +142,16 @@ let rec getNotifications (lastModified: DateTimeOffset option) (releasesHandler:
 let main () =
     async {
 
+        // If the file exists, it contains the last-modified value for the
+        // most recent notification we handled in a previous run.
+        let lastModified =
+            if File.Exists(last_modified_file) then
+                printfn $"Using last modified from file {last_modified_file}"
+                Some(File.ReadAllText last_modified_file |> JsonSerializer.Deserialize)
+            else
+                None
 
-        let! _ = getNotifications (None) (releasesHandler "queues/releasing_repos")
+        let! _ = getNotifications lastModified (releasesHandler "queues/releasing_repos")
         return 0
     }
 
