@@ -9,7 +9,7 @@ open System.Data
 open System.Data.SQLite
 open DbFun.Core.Models
 open DbFun.Core.Sqlite
-open Asfaload.Collector
+open System
 
 module Repos =
     // create table repos(id INTEGER PRIMARY KEY, hoster string, user string, repo string, subscribed bool default 0, last_release text, UNIQUE(hoster,user,repo));
@@ -27,7 +27,7 @@ module Repos =
         }
 
     let createConnection () : IDbConnection =
-        new SQLiteConnection("Data Source=repos.sqlite")
+        new SQLiteConnection($"""Data Source={Environment.GetEnvironmentVariable("REPOS_DB")}""")
 
     let config = QueryConfig.Default(createConnection).SqliteDateTimeAsString()
     let query = QueryBuilder(config)
