@@ -1,4 +1,5 @@
 #r "nuget: FSharp.SystemTextJson, 1.3.13"
+
 namespace Asfaload.Collector
 
 open System.Text.Json.Serialization

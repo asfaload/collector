@@ -1,5 +1,8 @@
 #r "nuget: FsHttp"
 #r "nuget: Microsoft.Playwright, 1.47.0"
+#r "nuget: FSharp.SystemTextJson, 1.3.13"
+#r "nuget: System.Data.SQLite, 1.0.119"
+#load "lib/db.fsx"
 // Getting playwright installed:
 // // Create a new project ni which you install playwright
 // dotnet new console -lang F#
@@ -13,6 +16,7 @@ open System
 open System.IO
 
 open Microsoft.Playwright
+open Asfaload.Collector.DB
 
 let browserStatePath = "private/auth/state.json"
 let fromEnv = Environment.GetEnvironmentVariable
@@ -41,6 +45,7 @@ let subscribeTo (page: IPage) (username: string) (repo: string) =
         return true
 
     }
+    |> Async.AwaitTask
 
 let firefoxAsync () =
     task {
@@ -109,7 +114,18 @@ let main () =
             let! _ = login context page
             ()
 
-        let! b = subscribeTo page "rbauduin" "TestRepo"
+        let! unsubscribedRepos = Repos.getUnsubscribedRepos () |> Repos.run
+
+        let! _r =
+            unsubscribedRepos
+            |> List.map (fun r -> subscribeTo page r.user r.repo)
+            |> Async.Sequential
+
+        let! _r =
+            unsubscribedRepos
+            |> List.map (fun r -> Repos.setSubscribed r |> Repos.run)
+            |> Async.Sequential
+
         return 0
     }
 
