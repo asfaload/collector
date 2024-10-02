@@ -159,7 +159,8 @@ let main () =
             else
                 None
 
-        let! _ = getNotifications lastModified (releasesHandler "queues/releasing_repos")
+        let queue = Environment.GetEnvironmentVariable("RELEASES_QUEUE")
+        let! _ = getNotifications lastModified (releasesHandler queue)
         return 0
     }
 

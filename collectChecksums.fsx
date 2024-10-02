@@ -228,7 +228,7 @@ let rec readQueue (queue: string) =
 
 let main () =
     async {
-        let! _ = readQueue "queues/releasing_repos"
+        let! _ = readQueue (Environment.GetEnvironmentVariable("RELEASES_QUEUE"))
         return 0
     }
 
