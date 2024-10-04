@@ -118,8 +118,14 @@ let rec getNotifications (lastModified: DateTimeOffset option) (releasesHandler:
                         v
                         |> JsonSerializer.Serialize
                         |> (fun json ->
-                            printfn "registering most recent last-modified"
-                            File.WriteAllText(last_modified_file, json))
+                            printfn $"registering most recent last-modified to {last_modified_file}"
+
+                            try
+                                File.WriteAllText(last_modified_file, json)
+                            with e ->
+                                printfn "got exception message %s, not registering last modified on disk" e.Message
+
+                        )
 
                         Some v
                     // This should not happen as the reponse is supposed to have the last-modified
