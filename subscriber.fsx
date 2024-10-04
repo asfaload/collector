@@ -22,7 +22,7 @@ open System.IO
 open Microsoft.Playwright
 open Asfaload.Collector.DB
 
-let browserStatePath = "private/auth/state.json"
+let browserStatePath = Environment.GetEnvironmentVariable("PLAYWRIGHT_STATE")
 let fromEnv = Environment.GetEnvironmentVariable
 
 let subscribeTo (page: IPage) (username: string) (repo: string) =
@@ -92,7 +92,7 @@ let login (context: IBrowserContext) (page: IPage) =
                 .ClickAsync()
 
         // This saves the contect to disk, what a weird api....
-        let! state = context.StorageStateAsync(BrowserContextStorageStateOptions(Path = "private/auth/state.json"))
+        let! state = context.StorageStateAsync(BrowserContextStorageStateOptions(Path = browserStatePath))
         return page
     }
 
