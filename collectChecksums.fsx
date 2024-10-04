@@ -42,7 +42,11 @@ let CHECKSUMS =
       // Neovim's approach:
       ".*\.sha256sum" ]
 
+let gitMutex = new System.Threading.Mutex()
+
 let gitCommit (subject: string) =
+
+    gitMutex.WaitOne() |> ignore
 
     cli {
         Exec "git"
@@ -51,8 +55,13 @@ let gitCommit (subject: string) =
     }
     |> Command.execute
     |> Output.throwIfErrored
+    |> ignore
+
+    gitMutex.ReleaseMutex()
+    ()
 
 let gitAdd (path: string) =
+    gitMutex.WaitOne() |> ignore
     printfn "running git add %s" path
 
     cli {
@@ -64,6 +73,7 @@ let gitAdd (path: string) =
     |> Output.throwIfErrored
     |> ignore
 
+    gitMutex.ReleaseMutex()
     path
 
 // Returns Some only if the directory was created.
