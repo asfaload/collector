@@ -166,6 +166,20 @@ module ChecksumsCollector =
 
         }
 
+
+    // FIXME: extract user and repo from url
+    let getReleaseByUrl (user: string) (repo: string) (url: string) =
+        async {
+            // we look in 20 last releases
+            let options = new ApiOptions(PageSize = 20, PageCount = 1)
+
+            let! releases = client.Repository.Release.GetAll(user, repo, options) |> Async.AwaitTask
+
+            let release = releases |> Seq.tryFind (fun r -> r.HtmlUrl = url)
+            return release
+
+        }
+
     let getLastGithubRelease (repo: Repo) =
         async {
             let options = new ApiOptions(PageSize = 3, PageCount = 1)
