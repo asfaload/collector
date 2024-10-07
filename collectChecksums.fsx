@@ -87,18 +87,26 @@ let createReleaseDir (path: string) =
     printfn "absolute dir path = %s" absoluteDirPath
 
     if Directory.Exists absoluteDirPath then
-        printfn "Directory exists, returning None to stop further processing"
-        None
+        // Path exists, return Some to continue processing
+        Some absoluteDirPath
     else
         let dir = Directory.CreateDirectory absoluteDirPath
+        // Return None when directory cannot be created, to stop further processing
         if dir.Exists then Some absoluteDirPath else None
 
+// Returns None if no download took place
 let downloadChecksums (checksumsUri: Uri) destinationDir =
     let filename = checksumsUri.Segments |> Array.last
     let filePath = Path.Combine(destinationDir, filename)
     printfn "downloading %s" (checksumsUri.ToString())
-    get (checksumsUri.ToString()) |> Request.send |> Response.saveFile filePath
-    filePath
+
+    // We do not re-download existing files
+    if not (File.Exists filePath) then
+        get (checksumsUri.ToString()) |> Request.send |> Response.saveFile filePath
+        Some filePath
+    else
+        // If file exists, return None to stop further processing
+        None
 
 let tokenAuth =
     new Octokit.Credentials(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
@@ -121,7 +129,7 @@ let downloadIndividualChecksumsFile (lastUri: Uri) (downloadSegments: string arr
             |> Array.append [| lastUri.Host |]
             |> Path.Combine
             |> createReleaseDir
-            |> Option.map (downloadChecksums checksumsUri)
+            |> Option.bind (downloadChecksums checksumsUri)
             |> Option.map gitAdd
 
 
