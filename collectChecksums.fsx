@@ -231,7 +231,7 @@ let updateChecksumsNames (rel: Release) (repo: Repo) =
     }
 
 
-let handleRepoRelease (qSession: IPersistentQueueSession) (repo: Repo) =
+let handleRepoRelease (cleanup: unit -> unit) (repo: Repo) =
     async {
         let! release = getLastGithubRelease repo
         let! updatedRepo = updateChecksumsNames release repo
@@ -241,8 +241,8 @@ let handleRepoRelease (qSession: IPersistentQueueSession) (repo: Repo) =
         if optionsArray |> Array.exists (fun o -> o.IsSome) then
             gitCommit $"{repo.kind.ToString()}://{repo.user}/{repo.repo}" |> ignore
 
-        // Only flush if all went well
-        qSession.Flush()
+        // Only cleanup if all went well
+        cleanup ()
 
     }
 
@@ -270,7 +270,8 @@ let rec readQueue (queue: string) =
             return! readQueue queue
         | Some repo ->
             printfn "repo = %A" repo
-            do! handleRepoRelease qSession repo
+            // Our cleanup function does w flush of the session
+            do! handleRepoRelease (fun () -> qSession.Flush()) repo
             qSession.Dispose()
             // Release the queue so writer can access it
             releasingReposQueue.Dispose()
