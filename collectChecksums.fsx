@@ -231,11 +231,8 @@ let updateChecksumsNames (repo: Repo) =
 
 let handleRepoRelease (qSession: IPersistentQueueSession) (repo: Repo) =
     async {
-        let! updatedRepos = [ repo ] |> List.map (fun r -> updateChecksumsNames r) |> Async.Parallel
-
-        let! options = updatedRepos |> Array.map downloadLastChecksums |> Async.Parallel
-
-        let optionsArray = options |> Array.reduce Array.append
+        let! updatedRepo = updateChecksumsNames repo
+        let! optionsArray = downloadLastChecksums updatedRepo
 
         // If we downloaded a new checksums file, we need to commit
         if optionsArray |> Array.exists (fun o -> o.IsSome) then
