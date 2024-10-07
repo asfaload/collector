@@ -16,7 +16,8 @@ let form =
 </head>
 <body>
 <form method="post" action="/add">
-user/repo: <input type="text" name="repo" placeholder="user/repo"></input>
+user/repo: <input type="text" name="repo" placeholder="user/repo"></input><br/>
+<input type="text" name="auth"></input>
 <button>Submit</button>
 </form>
 
@@ -28,14 +29,18 @@ let app: WebPart =
         [ GET >=> path "/" >=> OK form
           POST
           >=> request (fun req ->
-              let res =
-                  req["repo"]
-                  |> Option.map (fun r -> r.Split("/") |> (fun a -> (a[0], a[1])))
-                  |> Option.map (fun (user, repo) -> Repos.create user repo |> Repos.run |> Async.RunSynchronously)
+              match req["auth"] with
+              | Some "1348LLN" ->
 
-              match res with
-              | Some [ r ] -> Successful.OK $"""Insert repo {sprintf "%A" r}<br/>{form}"""
-              | _ -> Suave.ServerErrors.INTERNAL_ERROR "An error occurred")
+                  let res =
+                      req["repo"]
+                      |> Option.map (fun r -> r.Split("/") |> (fun a -> (a[0], a[1])))
+                      |> Option.map (fun (user, repo) -> Repos.create user repo |> Repos.run |> Async.RunSynchronously)
+
+                  match res with
+                  | Some [ r ] -> Successful.OK $"""Insert repo {sprintf "%A" r}<br/>{form}"""
+                  | _ -> Suave.ServerErrors.INTERNAL_ERROR "An error occurred"
+              | _ -> Suave.RequestErrors.FORBIDDEN "Provide authentication code")
 
           RequestErrors.NOT_FOUND "Page not found." ]
 
