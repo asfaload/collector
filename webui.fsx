@@ -1,6 +1,7 @@
 #r "nuget: Suave, 2.6.2"
 #r "nuget: System.Data.SQLite, 1.0.119"
 #load "lib/db.fsx"
+#load "lib/Shared.fsx"
 
 open Suave
 open Suave.Filters
@@ -38,7 +39,9 @@ let app: WebPart =
                       |> Option.map (fun r -> r.Split("/") |> (fun a -> (a[0], a[1])))
                       |> Option.map (fun (user, repo) ->
                           try
-                              Repos.create user repo |> Repos.run |> Async.RunSynchronously
+                              let created = Repos.create user repo |> Repos.run |> Async.RunSynchronously
+                              Asfaload.Collector.Queue.triggerReleaseDownload user repo
+                              created
                           with e ->
                               printfn "Exception inserting new repo: %s" e.Message
                               [])
