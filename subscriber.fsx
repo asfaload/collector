@@ -6,6 +6,7 @@
 #r "nuget: Microsoft.Playwright, 1.47.0"
 #r "nuget: FSharp.SystemTextJson, 1.3.13"
 #r "nuget: System.Data.SQLite, 1.0.119"
+#r "nuget: Otp.NET, 1.4.0"
 #load "lib/db.fsx"
 // Getting playwright installed:
 // // Create a new project ni which you install playwright
@@ -20,6 +21,7 @@ open System
 open System.IO
 
 open Microsoft.Playwright
+open OtpNet
 open Asfaload.Collector.DB
 
 let browserStatePath = Environment.GetEnvironmentVariable("PLAYWRIGHT_STATE")
@@ -55,7 +57,7 @@ let firefoxAsync () =
     task {
         let! playwright = Playwright.CreateAsync()
         let firefox = playwright.Firefox
-        let! browser = firefox.LaunchAsync(BrowserTypeLaunchOptions(Headless = true))
+        let! browser = firefox.LaunchAsync(BrowserTypeLaunchOptions(Headless = false))
         return browser
 
     }
@@ -91,6 +93,13 @@ let login (context: IBrowserContext) (page: IPage) =
                 .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Sign in", Exact = true))
                 .ClickAsync()
 
+        let totp =
+            Totp(Environment.GetEnvironmentVariable("TOTP_KEY") |> Base32Encoding.ToBytes)
+
+        let totpCode = totp.ComputeTotp()
+        do! page.GetByPlaceholder("XXXXXX").FillAsync(totpCode)
+
+        do! page.WaitForURLAsync("https://github.com/")
         // This saves the contect to disk, what a weird api....
         let! state = context.StorageStateAsync(BrowserContextStorageStateOptions(Path = browserStatePath))
         return page
