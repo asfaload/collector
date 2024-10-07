@@ -44,3 +44,17 @@ module Repos =
 
     let setSubscribed =
         query.Sql("update repos set subscribed=true where id=@id", Params.Record<Repo>(), Results.Unit)
+
+    let create (user: string) (repo: string) =
+        let repo =
+            { id = 0
+              hoster = Github
+              user = user
+              repo = repo
+              subscribed = false }
+
+        query.Sql
+            ("insert into repos(hoster,user,repo) VALUES ('github', @user, @repo) returning *",
+             Params.Record<Repo>(),
+             Results.List<Repo>())
+            repo
