@@ -36,11 +36,16 @@ let app: WebPart =
                   let res =
                       req["repo"]
                       |> Option.map (fun r -> r.Split("/") |> (fun a -> (a[0], a[1])))
-                      |> Option.map (fun (user, repo) -> Repos.create user repo |> Repos.run |> Async.RunSynchronously)
+                      |> Option.map (fun (user, repo) ->
+                          try
+                              Repos.create user repo |> Repos.run |> Async.RunSynchronously
+                          with e ->
+                              printfn "Exception inserting new repo: %s" e.Message
+                              [])
 
                   match res with
                   | Some [ r ] -> Successful.OK $"""Insert repo {sprintf "%A" r}<br/>{form}"""
-                  | _ -> Suave.ServerErrors.INTERNAL_ERROR "An error occurred"
+                  | _ -> Suave.ServerErrors.INTERNAL_ERROR $"An error occurred<br/>{form}"
               | _ -> Suave.RequestErrors.FORBIDDEN "Provide authentication code")
 
           RequestErrors.NOT_FOUND "Page not found." ]
