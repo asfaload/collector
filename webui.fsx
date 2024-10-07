@@ -28,6 +28,7 @@ let app: WebPart =
     choose
         [ GET >=> path "/" >=> OK form
           POST
+          >=> path "/add"
           >=> request (fun req ->
               match req["auth"] with
               | Some "1348LLN" ->
