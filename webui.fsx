@@ -50,4 +50,9 @@ let app: WebPart =
 
           RequestErrors.NOT_FOUND "Page not found." ]
 
-startWebServer defaultConfig app
+let cfg =
+    { defaultConfig with
+        bindings = [ HttpBinding.createSimple HTTP "0.0.0.0" 8080 ]
+        listenTimeout = System.TimeSpan.FromMilliseconds 3000. }
+
+startWebServer cfg app
