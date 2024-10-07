@@ -60,6 +60,35 @@ let gitCommit (subject: string) =
     gitMutex.ReleaseMutex()
     ()
 
+let gitPushIfAhead () =
+
+    gitMutex.WaitOne() |> ignore
+
+    let aheadCount =
+        cli {
+            Exec "git"
+            Arguments [ "rev-list"; "--count"; "origin/master..master" ]
+            WorkingDirectory(Environment.GetEnvironmentVariable "BASE_DIR")
+        }
+        |> Command.execute
+        |> Output.throwIfErrored
+        |> Output.toText
+        |> int
+
+    if aheadCount > 0 then
+        cli {
+            Exec "git"
+            Arguments [ "push" ]
+            WorkingDirectory(Environment.GetEnvironmentVariable "BASE_DIR")
+        }
+        |> Command.execute
+        |> Output.throwIfErrored
+        |> (fun o -> printfn "PUSH: %s" (o |> Output.toText))
+
+
+    gitMutex.ReleaseMutex()
+    ()
+
 let gitAdd (path: string) =
     gitMutex.WaitOne() |> ignore
     printfn "running git add %s" path
@@ -238,6 +267,7 @@ let rec readQueue (queue: string) =
             qSession.Dispose()
             // Release the queue so writer can access it
             releasingReposQueue.Dispose()
+            gitPushIfAhead ()
             printfn "Nothing in queue, will sleep 1s"
             do! Async.Sleep 1000
             return! readQueue queue
