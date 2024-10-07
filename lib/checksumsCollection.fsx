@@ -226,10 +226,8 @@ module ChecksumsCollector =
             return { repo with checksums = checksumsFiles }
         }
 
-
-    let handleRepoRelease (cleanup: unit -> unit) (repo: Repo) =
+    let getReleaseChecksums (cleanup: unit -> unit) (release: Release) (repo: Repo) =
         async {
-            let! release = getLastGithubRelease repo
             let! updatedRepo = updateChecksumsNames release repo
             let! optionsArray = downloadLastChecksums release updatedRepo
 
@@ -239,5 +237,11 @@ module ChecksumsCollector =
 
             // Only cleanup if all went well
             cleanup ()
+        }
 
+
+    let handleRepoRelease (cleanup: unit -> unit) (repo: Repo) =
+        async {
+            let! release = getLastGithubRelease repo
+            return! getReleaseChecksums cleanup release repo
         }
