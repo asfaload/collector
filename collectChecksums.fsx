@@ -170,20 +170,23 @@ let downloadIndividualChecksumsFile (lastUri: Uri) (downloadSegments: string arr
 
     }
 
-let getLastGithubRelease (username: string) (repo: string) =
+let getLastGithubRelease (repo: Repo) =
     async {
         let options = new ApiOptions(PageSize = 3, PageCount = 1)
-        let! releases = client.Repository.Release.GetAll(username, repo, options) |> Async.AwaitTask
+
+        let! releases =
+            client.Repository.Release.GetAll(repo.user, repo.repo, options)
+            |> Async.AwaitTask
+
         let last = releases |> Seq.head
         return last
 
     }
 
-let downloadLastChecksums (r: Repo) =
+let downloadLastChecksums (rel: Release) (r: Repo) =
     async {
         printfn "Running downloadLast for %s/%s" r.user r.repo
-        let! last = getLastGithubRelease r.user r.repo
-        let lastUri = System.Uri(last.HtmlUrl)
+        let lastUri = System.Uri(rel.HtmlUrl)
 
         let downloadSegments =
             lastUri.Segments |> Array.map (fun s -> if s = "tag/" then "download/" else s)
@@ -195,10 +198,9 @@ let downloadLastChecksums (r: Repo) =
 
     }
 
-let updateChecksumsNames (repo: Repo) =
+let updateChecksumsNames (rel: Release) (repo: Repo) =
     async {
-        let! lastRelease = getLastGithubRelease repo.user repo.repo
-        let releaseId = lastRelease.Id
+        let releaseId = rel.Id
 
         let! response =
             http {
@@ -231,8 +233,9 @@ let updateChecksumsNames (repo: Repo) =
 
 let handleRepoRelease (qSession: IPersistentQueueSession) (repo: Repo) =
     async {
-        let! updatedRepo = updateChecksumsNames repo
-        let! optionsArray = downloadLastChecksums updatedRepo
+        let! release = getLastGithubRelease repo
+        let! updatedRepo = updateChecksumsNames release repo
+        let! optionsArray = downloadLastChecksums release updatedRepo
 
         // If we downloaded a new checksums file, we need to commit
         if optionsArray |> Array.exists (fun o -> o.IsSome) then
