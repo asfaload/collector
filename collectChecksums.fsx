@@ -179,17 +179,17 @@ let getLastGithubRelease (username: string) (repo: string) =
 
     }
 
-let downloadLastChecksums (username: string) (repo: string) (checksums: string list) =
+let downloadLastChecksums (r: Repo) =
     async {
-        printfn "Running downloadLast for %s/%s" username repo
-        let! last = getLastGithubRelease username repo
+        printfn "Running downloadLast for %s/%s" r.user r.repo
+        let! last = getLastGithubRelease r.user r.repo
         let lastUri = System.Uri(last.HtmlUrl)
 
         let downloadSegments =
             lastUri.Segments |> Array.map (fun s -> if s = "tag/" then "download/" else s)
 
         return!
-            checksums
+            r.checksums
             |> List.map (fun name -> downloadIndividualChecksumsFile lastUri downloadSegments name)
             |> Async.Parallel
 
@@ -233,10 +233,7 @@ let handleRepoRelease (qSession: IPersistentQueueSession) (repo: Repo) =
     async {
         let! updatedRepos = [ repo ] |> List.map (fun r -> updateChecksumsNames r) |> Async.Parallel
 
-        let! options =
-            updatedRepos
-            |> Array.map (fun r -> downloadLastChecksums r.user r.repo r.checksums)
-            |> Async.Parallel
+        let! options = updatedRepos |> Array.map downloadLastChecksums |> Async.Parallel
 
         let optionsArray = options |> Array.reduce Array.append
 
