@@ -199,8 +199,3 @@ let main () =
     }
 
 main () |> Async.RunSynchronously
-main () |> Async.RunSynchronously
-main () |> Async.RunSynchronously
-main () |> Async.RunSynchronously
-main () |> Async.RunSynchronously
-main () |> Async.RunSynchronously
