@@ -35,6 +35,8 @@ module ChecksumsCollector =
           "SHASUMS256.txt"
           "SHASUMS512.txt"
           "SHASUMS512"
+          //DataDog/dd-trace-dotnet
+          "sha512.txt"
           // Neovim's approach:
           ".*\.sha256sum" ]
 
