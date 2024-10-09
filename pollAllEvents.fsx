@@ -25,6 +25,12 @@ FsHttp.Fsi.disableDebugLogs ()
 let last_modified_file =
     Environment.GetEnvironmentVariable("NOTIFICATIONS_LAST_MODIFIED_FILE")
 
+let reposWithChecksumsFile =
+    Environment.GetEnvironmentVariable("REPOS_WITH_CHECKSUMS_FILE")
+
+let reposWithoutChecksumsFile =
+    Environment.GetEnvironmentVariable("REPOS_WITHOUT_CHECKSUMS_FILE")
+
 let CHECKSUMS =
     [ "checksum.txt"
       "checksums.txt"
@@ -127,10 +133,10 @@ let checkChecksuminRelease (repo: string) (releaseId: int64) =
                     regex.IsMatch(a?name.ToString())))
 
         if hasChecksums then
-            File.AppendAllText("reposWithChecksums.txt", $"https://github.com/{repo}\n")
+            File.AppendAllText(reposWithChecksumsFile, $"https://github.com/{repo}\n")
             printfn "***** https://github.com/%s has a release with checksums!" repo
         else
-            File.AppendAllText("reposWithoutChecksums.txt", $"https://github.com/{repo}\n")
+            File.AppendAllText(reposWithoutChecksumsFile, $"https://github.com/{repo}\n")
             printfn "@@@@@ https://github.com/%s has a release without checksums!" repo
     else
         //printfn "----- https://github.com/%s has a release without artifact!" repo
@@ -192,6 +198,7 @@ let main () =
         return 0
     }
 
+main () |> Async.RunSynchronously
 main () |> Async.RunSynchronously
 main () |> Async.RunSynchronously
 main () |> Async.RunSynchronously
