@@ -8,6 +8,7 @@
 #r "nuget: System.Data.SQLite, 1.0.119"
 #r "nuget: Otp.NET, 1.4.0"
 #load "lib/db.fsx"
+#load "lib/Queue.fsx"
 // Getting playwright installed:
 // // Create a new project ni which you install playwright
 // dotnet new console -lang F#
@@ -126,7 +127,12 @@ let rec subscriptionLoop (page: IPage) =
 
         let! _r =
             unsubscribedRepos
-            |> List.map (fun r -> subscribeTo page r.user r.repo)
+            |> List.map (fun r ->
+                async {
+                    let! _r = subscribeTo page r.user r.repo
+                    Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo
+                    return ()
+                })
             |> Async.Sequential
 
         let! _r =
