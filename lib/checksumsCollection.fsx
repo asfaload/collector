@@ -190,7 +190,9 @@ module ChecksumsCollector =
                 client.Repository.Release.GetAll(repo.user, repo.repo, options)
                 |> Async.AwaitTask
 
-            let last = releases |> Seq.head
+            let last =
+                releases |> Seq.filter (fun r -> not r.Draft && not r.Prerelease) |> Seq.head
+
             return last
 
         }
