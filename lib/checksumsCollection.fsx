@@ -183,9 +183,13 @@ module ChecksumsCollector =
                 printfn "found %d releases " count
 
                 if count = 0 then
-                    return! looper (iteration + 1)
+                    if iteration < 10 then
+                        return! looper (iteration + 1)
+                    else
+                        printfn "No release found for %s/%s" repo.user repo.repo
+                        return None
                 else
-                    return (proper |> Seq.head)
+                    return (proper |> Seq.head |> Some)
 
             }
 
@@ -269,5 +273,8 @@ module ChecksumsCollector =
     let handleRepoRelease (cleanup: unit -> unit) (repo: Repo) =
         async {
             let! release = getLastGithubRelease repo
-            return! getReleaseChecksums cleanup release repo
+
+            match release with
+            | None -> ()
+            | Some release -> return! getReleaseChecksums cleanup release repo
         }
