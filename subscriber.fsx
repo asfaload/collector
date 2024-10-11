@@ -28,30 +28,34 @@ let browserStatePath = Environment.GetEnvironmentVariable("PLAYWRIGHT_STATE")
 let fromEnv = Environment.GetEnvironmentVariable
 
 let subscribeTo (page: IPage) (username: string) (repo: string) =
-    task {
-        let! _response = page.GotoAsync($"https://github.com/{username}/{repo}")
+    async {
+        let! _response = page.GotoAsync($"https://github.com/{username}/{repo}") |> Async.AwaitTask
 
         do!
             page
                 .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Watch"))
                 .ClickAsync()
+            |> Async.AwaitTask
 
-        do! page.GetByText("Custom", PageGetByTextOptions(Exact = true)).ClickAsync()
+        do!
+            page.GetByText("Custom", PageGetByTextOptions(Exact = true)).ClickAsync()
+            |> Async.AwaitTask
 
         do!
             page
                 .GetByRole(AriaRole.Checkbox, PageGetByRoleOptions(Name = "Releases", Exact = true))
                 .CheckAsync()
+            |> Async.AwaitTask
 
         do!
             page
                 .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Apply", Exact = true))
                 .ClickAsync()
+            |> Async.AwaitTask
 
         return true
 
     }
-    |> Async.AwaitTask
 
 let firefoxAsync () =
     task {
