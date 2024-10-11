@@ -168,6 +168,28 @@ module ChecksumsCollector =
 
         }
 
+    // Looks for most recent non-draft and non-prerelease
+    let rec getLastGithubRelease (repo: Repo) =
+        let rec looper (iteration: int) =
+            async {
+                let options = new ApiOptions(PageSize = 10, PageCount = iteration)
+
+                let! releases =
+                    client.Repository.Release.GetAll(repo.user, repo.repo, options)
+                    |> Async.AwaitTask
+
+                let proper = releases |> Seq.filter (fun r -> not r.Draft && not r.Prerelease)
+                let count = (proper |> Seq.length)
+                printfn "found %d releases " count
+
+                if count = 0 then
+                    return! looper (iteration + 1)
+                else
+                    return (proper |> Seq.head)
+
+            }
+
+        looper 1
 
     // FIXME: extract user and repo from url
     let getReleaseByUrl (user: string) (repo: string) (url: string) =
@@ -182,20 +204,6 @@ module ChecksumsCollector =
 
         }
 
-    let getLastGithubRelease (repo: Repo) =
-        async {
-            let options = new ApiOptions(PageSize = 3, PageCount = 1)
-
-            let! releases =
-                client.Repository.Release.GetAll(repo.user, repo.repo, options)
-                |> Async.AwaitTask
-
-            let last =
-                releases |> Seq.filter (fun r -> not r.Draft && not r.Prerelease) |> Seq.head
-
-            return last
-
-        }
 
     let downloadLastChecksums (rel: Release) (r: Repo) =
         async {
