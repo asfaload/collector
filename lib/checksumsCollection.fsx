@@ -275,6 +275,6 @@ module ChecksumsCollector =
             let! release = getLastGithubRelease repo
 
             match release with
-            | None -> ()
+            | None -> cleanup ()
             | Some release -> return! getReleaseChecksums cleanup release repo
         }
