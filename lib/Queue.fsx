@@ -9,7 +9,7 @@ module Queue =
 
     let triggerReleaseDownload (user: string) (repo: string) =
         let queue = Environment.GetEnvironmentVariable("RELEASES_QUEUE")
-        let releasingReposQueue = PersistentQueue.WaitFor(queue, TimeSpan.FromSeconds(300))
+        let releasingReposQueue = PersistentQueue.WaitFor(queue, TimeSpan.FromSeconds(600))
         let qSession = releasingReposQueue.OpenSession()
 
         let repo =

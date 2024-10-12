@@ -19,7 +19,7 @@ open Asfaload.Collector
 let rec readQueue (queue: string) =
     async {
         // This will wait until the queue can be locked.
-        let releasingReposQueue = PersistentQueue.WaitFor(queue, TimeSpan.FromSeconds(3))
+        let releasingReposQueue = PersistentQueue.WaitFor(queue, TimeSpan.FromSeconds(600))
 
         let qSession = releasingReposQueue.OpenSession()
 
