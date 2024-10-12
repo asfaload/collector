@@ -221,8 +221,12 @@ module ChecksumsCollector =
 
             return!
                 r.checksums
-                |> List.map (fun name -> downloadIndividualChecksumsFile lastUri downloadSegments name)
-                |> Async.Parallel
+                |> List.map (fun name ->
+                    async {
+                        do! Async.Sleep 1000
+                        return! downloadIndividualChecksumsFile lastUri downloadSegments name
+                    })
+                |> Async.Sequential
 
         }
 
