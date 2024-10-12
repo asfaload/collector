@@ -37,7 +37,7 @@ let releasesHandler (queueName: string) (json: System.Text.Json.JsonElement) =
     // As we `use` is, it gets disposed when becoming out of scope.
     // We cannot keep it open, because it would prevent other processes to access it.
     use releasingReposQueue =
-        PersistentQueue.WaitFor(queueName, TimeSpan.FromSeconds(10))
+        PersistentQueue.WaitFor(queueName, TimeSpan.FromSeconds(600))
 
     use qSession = releasingReposQueue.OpenSession()
 
