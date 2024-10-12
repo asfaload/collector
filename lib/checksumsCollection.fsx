@@ -265,12 +265,15 @@ module ChecksumsCollector =
                 return { repo with checksums = checksumsFiles }
             | _ ->
                 printfn
-                    "%s we got an error for %s/%s: %s!\n%s\nWe sleep 10 minutes "
+                    "%s we got an error for %s/%s: %s!\n%s\nWe sleep 10 minutes.\n retry-after= %s "
                     (DateTime.Now.ToString())
                     (repo.user)
                     (repo.repo)
                     (response.reasonPhrase)
                     (response.statusCode.ToString())
+                    (response.headers.TryGetValues "retry-after"
+                     |> (fun (present, values) -> if present then (Some(values |> Seq.head)) else None)
+                     |> Option.defaultValue "Absent")
 
                 do! Async.Sleep 600_000
                 return repo
