@@ -179,7 +179,9 @@ let eventHandler (el: System.Text.Json.JsonElement) =
             for event in el.EnumerateArray() do
                 let repo = (event?repo?name).ToString()
 
-                if not (reposSeen |> List.contains repo) then
+                // We skip repos named neovim as we encountered a ton of forks
+                // with no relevant data
+                if not (reposSeen |> List.contains repo) && not (repo.EndsWith("/neovim")) then
                     do! getReleasesForRepo repo
                     reposSeen <- List.append reposSeen [ repo ]
                 else
