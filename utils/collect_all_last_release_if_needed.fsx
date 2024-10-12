@@ -55,7 +55,7 @@ let main () =
                             Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo
                             printfn "Requested download for %s/%s in queue" r.user r.repo
                             // Avoid secundary rate limits
-                            do! Async.Sleep 10_000
+                            do! Async.Sleep 300_000
                     })
                 |> Async.Sequential
 
