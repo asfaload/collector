@@ -47,7 +47,7 @@ let CHECKSUMS =
 
 let mutable reposSeen = List<string>.Empty
 
-let rec getEvents (eventHandler: System.Text.Json.JsonElement -> unit) =
+let rec getEvents (eventHandler: System.Text.Json.JsonElement -> Async<unit>) =
     async {
 
         printfn "Start call at %A" DateTime.Now
@@ -97,7 +97,7 @@ let rec getEvents (eventHandler: System.Text.Json.JsonElement -> unit) =
 
             let s = response |> Response.toText
             let json = System.Text.Json.JsonDocument.Parse(s)
-            eventHandler json.RootElement
+            do! eventHandler json.RootElement
             // Now wait until poll interval is passed
             printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
             do! sleeper |> Async.AwaitTask
@@ -108,78 +108,84 @@ let rec getEvents (eventHandler: System.Text.Json.JsonElement -> unit) =
     }
 
 let checkChecksuminRelease (repo: string) (releaseId: int64) =
-    let json =
-        http {
-            GET $"https://api.github.com/repos/{repo}/releases/{releaseId}/assets"
-            Accept "application/vnd.github+json"
-            UserAgent "asfaload-collector"
-            AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
-            header "X-GitHub-Api-Version" "2022-11-28"
-        //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
-        }
-        |> Request.send
-        |> Response.toJson
+    async {
+        let! response =
+            http {
+                GET $"https://api.github.com/repos/{repo}/releases/{releaseId}/assets"
+                Accept "application/vnd.github+json"
+                UserAgent "asfaload-collector"
+                AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
+                header "X-GitHub-Api-Version" "2022-11-28"
+            //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
+            }
+            |> Request.sendAsync
+
+        let json = response |> Response.toJson
+        // Avoid secundary rate limits
+        do! Async.Sleep 1000
 
 
-    let releases = json.GetList()
+        let releases = json.GetList()
 
-    if releases |> List.length > 0 then
-        let hasChecksums =
-            releases
-            |> List.exists (fun a ->
-                CHECKSUMS
-                |> List.exists (fun chk ->
-                    let regex = Regex(chk)
-                    regex.IsMatch(a?name.ToString())))
+        if releases |> List.length > 0 then
+            let hasChecksums =
+                releases
+                |> List.exists (fun a ->
+                    CHECKSUMS
+                    |> List.exists (fun chk ->
+                        let regex = Regex(chk)
+                        regex.IsMatch(a?name.ToString())))
 
-        if hasChecksums then
-            File.AppendAllText(reposWithChecksumsFile, $"https://github.com/{repo}\n")
-            printfn "***** https://github.com/%s has a release with checksums!" repo
-        else
-            File.AppendAllText(reposWithoutChecksumsFile, $"https://github.com/{repo}\n")
-            printfn "@@@@@ https://github.com/%s has a release without checksums!" repo
-    else
-        //printfn "----- https://github.com/%s has a release without artifact!" repo
-        ()
-
+            if hasChecksums then
+                File.AppendAllText(reposWithChecksumsFile, $"https://github.com/{repo}\n")
+                printfn "***** https://github.com/%s has a release with checksums!" repo
+            else
+                //printfn "----- https://github.com/%s has a release without artifact!" repo
+                ()
+    }
 
 
 
 let getReleasesForRepo (repo: string) =
-    let response =
-        http {
-            GET $"https://api.github.com/repos/{repo}/releases"
-            Accept "application/vnd.github+json"
-            UserAgent "asfaload-collector"
-            AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
-            header "X-GitHub-Api-Version" "2022-11-28"
-        }
-        |> Request.send
-        |> Response.toJson
+    async {
+        let! response =
+            http {
+                GET $"https://api.github.com/repos/{repo}/releases"
+                Accept "application/vnd.github+json"
+                UserAgent "asfaload-collector"
+                AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
+                header "X-GitHub-Api-Version" "2022-11-28"
+            }
+            |> Request.sendAsync
 
-    if response.ValueKind = JsonValueKind.Array && response.GetArrayLength() > 0 then
-        //for release in response.EnumerateArray() do
-        //    printfn "Got releases %A for repo %s" (release?url) repo
-        let lastRelease = response.GetList() |> List.head
-        checkChecksuminRelease repo ((lastRelease?id).GetInt64())
-    else
-        ()
+        let json = response |> Response.toJson
+        do! Async.Sleep 1000
+
+        if json.ValueKind = JsonValueKind.Array && json.GetArrayLength() > 0 then
+            //for release in response.EnumerateArray() do
+            //    printfn "Got releases %A for repo %s" (release?url) repo
+            let lastRelease = json.GetList() |> List.head
+            do! checkChecksuminRelease repo ((lastRelease?id).GetInt64())
+        else
+            ()
+    }
 
 
 
 let eventHandler (el: System.Text.Json.JsonElement) =
-    if el.ValueKind = JsonValueKind.Array then
-        //let releases = { for event in el.EnumerateArray() when event?``type``="Release"}
-        for event in el.EnumerateArray() do
-            let repo = (event?repo?name).ToString()
+    async {
+        if el.ValueKind = JsonValueKind.Array then
+            //let releases = { for event in el.EnumerateArray() when event?``type``="Release"}
+            for event in el.EnumerateArray() do
+                let repo = (event?repo?name).ToString()
 
-            if not (reposSeen |> List.contains repo) then
-                getReleasesForRepo repo
-                reposSeen <- List.append reposSeen [ repo ]
-            else
-                //printfn "%s skipping repo already seen" repo
-                ()
-
+                if not (reposSeen |> List.contains repo) then
+                    do! getReleasesForRepo repo
+                    reposSeen <- List.append reposSeen [ repo ]
+                else
+                    //printfn "%s skipping repo already seen" repo
+                    ()
+    }
 
 let main () =
     async {

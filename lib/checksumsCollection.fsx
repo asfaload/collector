@@ -184,6 +184,8 @@ module ChecksumsCollector =
 
                 if count = 0 then
                     if iteration < 10 then
+                        // Avoid secundary rate limits
+                        do! Async.Sleep 1000
                         return! looper (iteration + 1)
                     else
                         printfn "No release found for %s/%s" repo.user repo.repo
@@ -258,7 +260,14 @@ module ChecksumsCollector =
                 printfn "found checksums files %A" checksumsFiles
                 return { repo with checksums = checksumsFiles }
             | _ ->
-                printfn "%s we got an error for %s/%s: %s!\n%s\nWe sleep 10 minutes " (DateTime.Now.ToString())(repo.user) (repo.repo) (response.reasonPhrase)(response.statusCode.ToString())
+                printfn
+                    "%s we got an error for %s/%s: %s!\n%s\nWe sleep 10 minutes "
+                    (DateTime.Now.ToString())
+                    (repo.user)
+                    (repo.repo)
+                    (response.reasonPhrase)
+                    (response.statusCode.ToString())
+
                 do! Async.Sleep 600_000
                 return repo
 
@@ -285,5 +294,4 @@ module ChecksumsCollector =
             match release with
             | None -> cleanup ()
             | Some release -> return! getReleaseChecksums cleanup release repo
-        }
         }

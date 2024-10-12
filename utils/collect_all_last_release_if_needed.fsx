@@ -28,33 +28,38 @@ let readLines (filePath: string) =
 
 
 let main () =
-    let args = fsi.CommandLineArgs
+    async {
+        let args = fsi.CommandLineArgs
 
-    if args |> Seq.length < 2 then
-        printfn "requires as arguments: file_with_repos_urls"
-        1
-    else
+        if args |> Seq.length < 2 then
+            printfn "requires as arguments: file_with_repos_urls"
+            return 1
+        else
 
-        let file = args[1]
+            let file = args[1]
 
-        readLines file
-        |> Seq.map (fun (l: string) -> l.Replace("https://github.com/", "").Split("/"))
-        |> Seq.map (fun a -> (a[0], a[1]))
-        |> Seq.map (fun (user, repo) ->
-            { user = user
-              repo = repo
-              checksums = []
-              kind = Github })
-        |> Seq.iter (fun r ->
-            try
-                if Directory.Exists(Path.Join([| baseDir; "github.com"; r.user; r.repo |])) then
-                    printfn "local dir for %s/%s already exists, skipping trigger" r.user r.repo
-                else
-                    Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo
-                    printfn "triggered download for %s/%s" r.user r.repo
-            with e ->
-                printfn "Exception triggering download for repo: %s" e.Message)
+            let! _r =
+                readLines file
+                |> Seq.map (fun (l: string) -> l.Replace("https://github.com/", "").Split("/"))
+                |> Seq.map (fun a -> (a[0], a[1]))
+                |> Seq.map (fun (user, repo) ->
+                    { user = user
+                      repo = repo
+                      checksums = []
+                      kind = Github })
+                |> Seq.map (fun r ->
+                    async {
+                        if Directory.Exists(Path.Join([| baseDir; "github.com"; r.user; r.repo |])) then
+                            printfn "local dir for %s/%s already exists, skipping trigger" r.user r.repo
+                        else
+                            Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo
+                            printfn "Requested download for %s/%s in queue" r.user r.repo
+                            // Avoid secundary rate limits
+                            do! Async.Sleep 10_000
+                    })
+                |> Async.Sequential
 
-        0
+            return 0
+    }
 
-main ()
+main () |> Async.RunSynchronously

@@ -45,6 +45,8 @@ let rec readQueue (queue: string) =
             qSession.Dispose()
             // Release the queue so writer can access it
             releasingReposQueue.Dispose()
+            // Introduce a delay to avoid secondary rate limits
+            do! Async.Sleep 5000
             return! readQueue queue
 
     }
