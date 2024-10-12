@@ -234,6 +234,8 @@ module ChecksumsCollector =
         async {
             let releaseId = rel.Id
 
+            do! Async.Sleep 60_000
+
             let! response =
                 http {
                     GET $"https://api.github.com/repos/{repo.user}/{repo.repo}/releases/{releaseId}/assets"
@@ -265,7 +267,7 @@ module ChecksumsCollector =
                 return { repo with checksums = checksumsFiles }
             | _ ->
                 printfn
-                    "%s we got an error for %s/%s: %s!\n%s\nWe sleep 10 minutes.\n retry-after= %s "
+                    "%s we got an error for %s/%s: %s!\n%s\nWe sleep one hour.\n retry-after= %s "
                     (DateTime.Now.ToString())
                     (repo.user)
                     (repo.repo)
@@ -275,7 +277,7 @@ module ChecksumsCollector =
                      |> (fun (present, values) -> if present then (Some(values |> Seq.head)) else None)
                      |> Option.defaultValue "Absent")
 
-                do! Async.Sleep 600_000
+                do! Async.Sleep 3600_000
                 return repo
 
         }
