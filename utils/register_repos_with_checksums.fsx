@@ -2,10 +2,10 @@
 // dotnet fsi manually_get_release_checksums.fsx $user $repo $release_url
 #r "nuget: DiskQueue, 1.7.1"
 #r "nuget: System.Data.SQLite, 1.0.119"
-#load "lib/db.fsx"
-#load "lib/Shared.fsx"
-#load "lib/checksumsCollection.fsx"
-#load "lib/Queue.fsx"
+#load "../lib/db.fsx"
+#load "../lib/Shared.fsx"
+#load "../lib/checksumsCollection.fsx"
+#load "../lib/Queue.fsx"
 
 open Asfaload.Collector
 open Asfaload.Collector.DB

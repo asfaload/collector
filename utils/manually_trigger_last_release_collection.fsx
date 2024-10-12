@@ -1,7 +1,7 @@
 // Script to manually trigger a release collection
 // dotnet fsi manually_send_release.fsx $user $repo
 #r "nuget: DiskQueue, 1.7.1"
-#load "lib/Shared.fsx"
+#load "../lib/Shared.fsx"
 
 open System
 open DiskQueue

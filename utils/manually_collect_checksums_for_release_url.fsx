@@ -1,8 +1,8 @@
 // Script to manually download the checksums of a specific release
 // dotnet fsi manually_get_release_checksums.fsx $user $repo $release_url
 #r "nuget: DiskQueue, 1.7.1"
-#load "lib/Shared.fsx"
-#load "lib/checksumsCollection.fsx"
+#load "../lib/Shared.fsx"
+#load "../lib/checksumsCollection.fsx"
 
 open Asfaload.Collector
 open Asfaload.Collector.ChecksumsCollector
