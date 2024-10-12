@@ -56,7 +56,7 @@ let rec getEvents (eventHandler: System.Text.Json.JsonElement -> unit) =
             http {
                 GET "https://api.github.com/events"
                 Accept "application/vnd.github+json"
-                UserAgent "rbauduin-test"
+                UserAgent "asfaload-collector"
                 AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
                 header "X-GitHub-Api-Version" "2022-11-28"
             }
@@ -112,7 +112,7 @@ let checkChecksuminRelease (repo: string) (releaseId: int64) =
         http {
             GET $"https://api.github.com/repos/{repo}/releases/{releaseId}/assets"
             Accept "application/vnd.github+json"
-            UserAgent "rbauduin-test"
+            UserAgent "asfaload-collector"
             AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
             header "X-GitHub-Api-Version" "2022-11-28"
         //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
@@ -150,7 +150,7 @@ let getReleasesForRepo (repo: string) =
         http {
             GET $"https://api.github.com/repos/{repo}/releases"
             Accept "application/vnd.github+json"
-            UserAgent "rbauduin-test"
+            UserAgent "asfaload-collector"
             AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
             header "X-GitHub-Api-Version" "2022-11-28"
         }
