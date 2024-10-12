@@ -238,22 +238,30 @@ module ChecksumsCollector =
                 //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
                 }
                 |> Request.sendAsync
+            // Ensure we avoid secundary rate limits
+            do! Async.Sleep 1000
 
-            let json = response |> Response.toJson
+            match response.statusCode with
+            | Net.HttpStatusCode.OK ->
+                let json = response |> Response.toJson
 
-            let checksumsFiles =
-                json.AsArray()
-                |> Array.filter (fun a ->
-                    CHECKSUMS
-                    |> List.exists (fun chk ->
-                        let regex = Regex(chk)
-                        regex.IsMatch(a?name.AsString())))
-                |> Array.map (fun a -> a?name.AsString())
-                |> Array.toList
+                let checksumsFiles =
+                    json.AsArray()
+                    |> Array.filter (fun a ->
+                        CHECKSUMS
+                        |> List.exists (fun chk ->
+                            let regex = Regex(chk)
+                            regex.IsMatch(a?name.AsString())))
+                    |> Array.map (fun a -> a?name.AsString())
+                    |> Array.toList
 
-            printfn "found checksums files %A" checksumsFiles
+                printfn "found checksums files %A" checksumsFiles
+                return { repo with checksums = checksumsFiles }
+            | _ ->
+                printfn "%s we got an error for %s/%s: %s!\n%s\nWe sleep 10 minutes " (DateTime.Now.ToString())(repo.user) (repo.repo) (response.reasonPhrase)(response.statusCode.ToString())
+                do! Async.Sleep 600_000
+                return repo
 
-            return { repo with checksums = checksumsFiles }
         }
 
     let getReleaseChecksums (cleanup: unit -> unit) (release: Release) (repo: Repo) =
@@ -277,4 +285,5 @@ module ChecksumsCollector =
             match release with
             | None -> cleanup ()
             | Some release -> return! getReleaseChecksums cleanup release repo
+        }
         }
