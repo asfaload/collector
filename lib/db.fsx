@@ -53,8 +53,9 @@ module Repos =
               repo = repo
               subscribed = false }
 
+        // `or ignore` to ignore unique constraints errors
         query.Sql
-            ("insert into repos(hoster,user,repo) VALUES ('github', @user, @repo) returning *",
+            ("insert or ignore into repos(hoster,user,repo) VALUES ('github', @user, @repo) returning *",
              Params.Record<Repo>(),
              Results.List<Repo>())
             repo
