@@ -140,12 +140,14 @@ let checkChecksuminRelease (repo: string) (releaseId: int64) =
                         regex.IsMatch(a?name.ToString())))
 
             if hasChecksums then
+                printfn "***** https://github.com/%s has a release with checksums!" repo
                 let (user, repo) = repo.Split("/") |> fun a -> (a[0], a[1])
 
                 let created =
                     Repos.create user repo |> Repos.run |> Async.RunSynchronously |> List.head
 
-                printfn "***** https://github.com/%s/%s has a release with checksums!" created.user created.repo
+                ()
+
             else
                 //printfn "----- https://github.com/%s has a release without artifact!" repo
                 ()
