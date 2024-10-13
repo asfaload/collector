@@ -143,10 +143,12 @@ let checkChecksuminRelease (repo: string) (releaseId: int64) =
                 printfn "***** https://github.com/%s has a release with checksums!" repo
                 let (user, repo) = repo.Split("/") |> fun a -> (a[0], a[1])
 
-                let created =
-                    Repos.create user repo |> Repos.run |> Async.RunSynchronously |> List.head
+                let created = Repos.create user repo |> Repos.run |> Async.RunSynchronously
 
-                ()
+                if created |> List.length = 0 then
+                    printfn "but %s/%s was already known" user repo
+                else
+                    printfn "and %s/%s has been added to sqlite" user repo
 
             else
                 //printfn "----- https://github.com/%s has a release without artifact!" repo
