@@ -6,19 +6,22 @@
 // count regarding the requests quota.
 // When a new release is available, it sends it on the DiskQueue for another script to
 // collect the checksums of the release.
-#load "lib/Shared.fsx"
+#r "nuget: System.Data.SQLite, 1.0.119"
 #r "nuget: FsHttp"
 #r "nuget: FsHttp"
 #r "nuget: Fsharp.Data"
 #r "nuget: DiskQueue, 1.7.1"
 #r "nuget: FsHttp.FSharpData, 14.5.1"
 #r "nuget: FSharp.SystemTextJson, 1.3.13"
+#load "lib/Shared.fsx"
+#load "lib/db.fsx"
 
 open System
 open System.IO
 open FsHttp
 open System.Text.Json
 open System.Text.RegularExpressions
+open Asfaload.Collector.DB
 
 FsHttp.Fsi.disableDebugLogs ()
 
@@ -137,8 +140,12 @@ let checkChecksuminRelease (repo: string) (releaseId: int64) =
                         regex.IsMatch(a?name.ToString())))
 
             if hasChecksums then
-                File.AppendAllText(reposWithChecksumsFile, $"https://github.com/{repo}\n")
-                printfn "***** https://github.com/%s has a release with checksums!" repo
+                let (user, repo) = repo.Split("/") |> fun a -> (a[0], a[1])
+
+                let created =
+                    Repos.create user repo |> Repos.run |> Async.RunSynchronously |> List.head
+
+                printfn "***** https://github.com/%s/%s has a release with checksums!" created.user created.repo
             else
                 //printfn "----- https://github.com/%s has a release without artifact!" repo
                 ()
