@@ -211,6 +211,8 @@ let main () =
                 None
 
         let queue = Environment.GetEnvironmentVariable("RELEASES_QUEUE")
+        // Sleep at restart preventing too rapid requests in case of container restart loop
+        do! Async.Sleep 60000
         let! _ = getEvents eventHandler
         return 0
     }
