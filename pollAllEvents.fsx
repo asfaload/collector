@@ -189,7 +189,7 @@ let eventHandler (el: System.Text.Json.JsonElement) =
             //let releases = { for event in el.EnumerateArray() when event?``type``="Release"}
             for event in el.EnumerateArray() do
                 let fullRepoName = (event?repo?name).ToString()
-                printfn "looking as %s" fullRepoName
+                printf "looking at %s: " fullRepoName
                 // We skip repos named neovim as we encountered a ton of forks
                 // with no relevant data
                 let user, gitRepo = fullRepoName.Split("/") |> (fun a -> a[0], a[1])
@@ -197,10 +197,11 @@ let eventHandler (el: System.Text.Json.JsonElement) =
                 let seen = count <> 0
 
                 if not seen && not (fullRepoName.EndsWith("/neovim")) then
+                    printfn "**NEW**"
                     do! Repos.seen user gitRepo |> Repos.run
                     do! getReleasesForRepo fullRepoName
                 else
-                    //printfn "%s skipping repo already seen" repo
+                    printfn "-known-"
                     ()
     }
 
