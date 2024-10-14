@@ -59,3 +59,32 @@ module Repos =
              Params.Record<Repo>(),
              Results.List<Repo>())
             repo
+
+    let seen (user: string) (repo: string) =
+        let repo =
+            { id = 0
+              hoster = Github
+              user = user
+              repo = repo
+              subscribed = false }
+
+        // `or ignore` to ignore unique constraints errors
+        query.Sql
+            ("insert or ignore into repos_seen(hoster,user,repo) VALUES ('github', @user, @repo)",
+             Params.Record<Repo>(),
+             Results.Unit)
+            repo
+
+    let isKnown (user: string) (repo: string) =
+        let repo =
+            { id = 0
+              hoster = Github
+              user = user
+              repo = repo
+              subscribed = false }
+
+        query.Sql
+            ("select count(*) from repos_seen where user=@user and repo=@repo",
+             Params.Record<Repo>(),
+             Results.Single<int64>())
+            repo
