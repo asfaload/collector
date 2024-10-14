@@ -42,6 +42,8 @@ let main () =
                 readLines file
                 |> Seq.map (fun (l: string) -> l.Replace("https://github.com/", "").Split("/"))
                 |> Seq.map (fun a -> (a[0], a[1]))
+                // Dot not track all neovim forks
+                |> Seq.filter (fun (_u, r) -> r <> "neovim")
                 |> Seq.map (fun (user, repo) ->
                     { user = user
                       repo = repo
