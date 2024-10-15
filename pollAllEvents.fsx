@@ -37,16 +37,10 @@ let reposWithoutChecksumsFile =
 let CHECKSUMS =
     [ "checksum.txt"
       "checksums.txt"
-      "SHA256SUMS"
-      "SHA256SUMS.txt"
-      "SHA512SUMS"
-      "SHA512SUMS.txt"
       "SHASUMS256"
-      "SHASUMS256.txt"
-      "SHASUMS512.txt"
       "SHASUMS512"
-      // Neovim's approach:
-      ".*\.sha256sum" ]
+      "sha256"
+      "sha512" ]
 
 let mutable reposSeen = List<string>.Empty
 
@@ -135,9 +129,7 @@ let checkChecksuminRelease (repo: string) (releaseId: int64) =
                 releases
                 |> List.exists (fun a ->
                     CHECKSUMS
-                    |> List.exists (fun chk ->
-                        let regex = Regex(chk)
-                        regex.IsMatch(a?name.ToString())))
+                    |> List.exists (fun chk -> Regex.IsMatch(a?name.ToString(), chk, RegexOptions.IgnoreCase)))
 
             if hasChecksums then
                 printfn "***** https://github.com/%s has a release with checksums!" repo
