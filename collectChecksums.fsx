@@ -5,6 +5,8 @@
 // It looks for checksums files in the release artifacts according to pre-defined patterns.
 // When the checksums of a release have been downloaded, a new commit is registered.
 
+#r "nuget: System.Data.SQLite, 1.0.119"
+#load "lib/db.fsx"
 #r "nuget: DiskQueue, 1.7.1"
 #r "nuget: Octokit, 13.0.1"
 #load "lib/checksumsCollection.fsx"

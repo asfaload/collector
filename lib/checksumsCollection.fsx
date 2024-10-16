@@ -1,5 +1,6 @@
 namespace Asfaload.Collector
 
+#load "db.fsx"
 #load "Shared.fsx"
 #r "nuget: Octokit, 13.0.1"
 #r "nuget: FsHttp"

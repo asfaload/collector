@@ -8,20 +8,19 @@
 // collect the checksums of the release.
 #r "nuget: System.Data.SQLite, 1.0.119"
 #r "nuget: FsHttp"
-#r "nuget: FsHttp"
 #r "nuget: Fsharp.Data"
 #r "nuget: DiskQueue, 1.7.1"
 #r "nuget: FsHttp.FSharpData, 14.5.1"
 #r "nuget: FSharp.SystemTextJson, 1.3.13"
-#load "lib/Shared.fsx"
 #load "lib/db.fsx"
+#load "lib/Shared.fsx"
 
 open System
 open System.IO
 open FsHttp
 open System.Text.Json
-open System.Text.RegularExpressions
 open Asfaload.Collector.DB
+open Asfaload.Collector.ChecksumHelpers
 
 FsHttp.Fsi.disableDebugLogs ()
 
@@ -33,14 +32,6 @@ let reposWithChecksumsFile =
 
 let reposWithoutChecksumsFile =
     Environment.GetEnvironmentVariable("REPOS_WITHOUT_CHECKSUMS_FILE")
-
-let CHECKSUMS =
-    [ "checksum.txt"
-      "checksums.txt"
-      "SHASUMS256"
-      "SHASUMS512"
-      "sha256"
-      "sha512" ]
 
 let mutable reposSeen = List<string>.Empty
 
@@ -104,74 +95,6 @@ let rec getEvents (eventHandler: System.Text.Json.JsonElement -> Async<unit>) =
             return Unchecked.defaultof<_>
     }
 
-let checkChecksuminRelease (repo: string) (releaseId: int64) =
-    async {
-        let! response =
-            http {
-                GET $"https://api.github.com/repos/{repo}/releases/{releaseId}/assets"
-                Accept "application/vnd.github+json"
-                UserAgent "asfaload-collector"
-                AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
-                header "X-GitHub-Api-Version" "2022-11-28"
-            //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
-            }
-            |> Request.sendAsync
-
-        let json = response |> Response.toJson
-        // Avoid secundary rate limits
-        do! Async.Sleep 1000
-
-
-        let releases = json.GetList()
-
-        if releases |> List.length > 0 then
-            let hasChecksums =
-                releases
-                |> List.exists (fun a ->
-                    CHECKSUMS
-                    |> List.exists (fun chk -> Regex.IsMatch(a?name.ToString(), chk, RegexOptions.IgnoreCase)))
-
-            if hasChecksums then
-                printfn "***** https://github.com/%s has a release with checksums!" repo
-                let (user, repo) = repo.Split("/") |> fun a -> (a[0], a[1])
-
-                let created = Repos.create user repo |> Repos.run |> Async.RunSynchronously
-
-                if created |> List.length = 0 then
-                    printfn "but %s/%s was already known" user repo
-                else
-                    printfn "and %s/%s has been added to sqlite" user repo
-
-            else
-                //printfn "----- https://github.com/%s has a release without artifact!" repo
-                ()
-    }
-
-
-
-let getReleasesForRepo (repo: string) =
-    async {
-        let! response =
-            http {
-                GET $"https://api.github.com/repos/{repo}/releases"
-                Accept "application/vnd.github+json"
-                UserAgent "asfaload-collector"
-                AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
-                header "X-GitHub-Api-Version" "2022-11-28"
-            }
-            |> Request.sendAsync
-
-        let json = response |> Response.toJson
-        do! Async.Sleep 1000
-
-        if json.ValueKind = JsonValueKind.Array && json.GetArrayLength() > 0 then
-            //for release in response.EnumerateArray() do
-            //    printfn "Got releases %A for repo %s" (release?url) repo
-            let lastRelease = json.GetList() |> List.head
-            do! checkChecksuminRelease repo ((lastRelease?id).GetInt64())
-        else
-            ()
-    }
 
 
 
@@ -191,7 +114,12 @@ let eventHandler (el: System.Text.Json.JsonElement) =
                 if not seen && not (fullRepoName.EndsWith("/neovim")) then
                     printfn "**NEW**"
                     do! Repos.seen user gitRepo |> Repos.run
-                    do! getReleasesForRepo fullRepoName
+
+                    match! getReleasesForRepo fullRepoName with
+                    | NoRelease -> printfn "No release found"
+                    | NoChecksum -> printfn "Release found, but no checksum file was found"
+                    | Added -> printfn "Added, repo is now tracked"
+                    | Known -> printfn "Repo was already known"
                 else
                     printfn "-known-"
                     ()

@@ -6,6 +6,8 @@
 // count regarding the requests quota.
 // When a new release is available, it sends it on the DiskQueue for another script to
 // collect the checksums of the release.
+#r "nuget: System.Data.SQLite, 1.0.119"
+#load "lib/db.fsx"
 #load "lib/Shared.fsx"
 #r "nuget: FsHttp"
 #r "nuget: FsHttp"

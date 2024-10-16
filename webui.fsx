@@ -8,8 +8,24 @@ open Suave
 open Suave.Filters
 open Suave.Operators
 open Suave.Successful
+open Suave.Json
 open Asfaload.Collector.DB
+open Asfaload.Collector.ChecksumHelpers
+open System.Runtime.Serialization
 
+[<DataContract>]
+type RepoToRegister =
+    { [<field: DataMember(Name = "user")>]
+      user: string
+      [<field: DataMember(Name = "repo")>]
+      repo: string }
+
+[<DataContract>]
+type RegisterReponse =
+    { [<field: DataMember(Name = "status")>]
+      status: string
+      [<field: DataMember(Name = "msg")>]
+      msg: string }
 
 let form =
     """
@@ -51,6 +67,31 @@ let app: WebPart =
                   | Some [ r ] -> Successful.OK $"""Insert repo {sprintf "%A" r}<br/>{form}"""
                   | _ -> Suave.ServerErrors.INTERNAL_ERROR $"An error occurred<br/>{form}"
               | _ -> Suave.RequestErrors.FORBIDDEN "Provide authentication code")
+          POST
+          >=> path "/register"
+          >=> (mapJson (fun (info: RepoToRegister) ->
+              async {
+                  printfn "register %s/%s" info.user info.repo
+
+                  match! getReleasesForRepo $"{info.user}/{info.repo}" with
+                  | NoRelease ->
+                      return
+                          { status = "NO_RELEASE"
+                            msg = "No release found" }
+                  | NoChecksum ->
+                      return
+                          { status = "NO_CHECKSUM"
+                            msg = "Release found, but no checksum file was found" }
+                  | Added ->
+                      return
+                          { status = "ADDED"
+                            msg = "Added, repo is now tracked" }
+                  | Known ->
+                      return
+                          { status = "KNOWN"
+                            msg = "Repo was already known" }
+              }
+              |> Async.RunSynchronously))
 
           RequestErrors.NOT_FOUND "Page not found." ]
 
