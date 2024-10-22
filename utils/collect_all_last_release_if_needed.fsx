@@ -1,11 +1,9 @@
 // Script to manually trigger a release collection
 // dotnet fsi manually_send_release.fsx $user $repo
-#r "nuget: DiskQueue, 1.7.1"
 #load "../lib/Shared.fsx"
 #load "../lib/Queue.fsx"
 
 open System
-open DiskQueue
 open Asfaload.Collector
 open System.Text.Json
 open System.IO
@@ -54,7 +52,7 @@ let main () =
                         if Directory.Exists(Path.Join([| baseDir; "github.com"; r.user; r.repo |])) then
                             printfn "local dir for %s/%s already exists, skipping trigger" r.user r.repo
                         else
-                            Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo
+                            do! Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo |> Async.AwaitTask
                             printfn "Requested download for %s/%s in queue" r.user r.repo
                             // Avoid secundary rate limits
                             do! Async.Sleep 300_000

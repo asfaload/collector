@@ -1,4 +1,4 @@
-// Script to collect checksums from new releases registered on the DiskQueue by the script
+// Script to collect checksums from new releases registered on the Queue by the script
 // looking for new notifications.
 // It downloads the checksums under a directory hierarchy mimicking the source repo's path to the checksums file,
 // including the host, under $BASE_DIR, which needs to be a git repo.
@@ -7,55 +7,32 @@
 
 #r "nuget: System.Data.SQLite, 1.0.119"
 #load "lib/db.fsx"
-#r "nuget: DiskQueue, 1.7.1"
+#load "lib/Queue.fsx"
 #r "nuget: Octokit, 13.0.1"
 #load "lib/checksumsCollection.fsx"
 
-open DiskQueue
-open System
-open System.Text.Json
 open Asfaload.Collector.ChecksumsCollector
 open Asfaload.Collector
 
 
-let rec readQueue (queue: string) =
-    async {
+let rec readQueue () =
+    task {
         // This will wait until the queue can be locked.
-        let releasingReposQueue = PersistentQueue.WaitFor(queue, TimeSpan.FromSeconds(600))
+        do!
+            Queue.consumeReleases (fun repo ->
+                printfn "repo = %A" repo
+                handleRepoRelease repo |> Async.RunSynchronously)
 
-        let qSession = releasingReposQueue.OpenSession()
-
-        let repo =
-            qSession.Dequeue()
-            |> Option.ofObj
-            |> Option.map System.Text.Encoding.ASCII.GetString
-            |> Option.map JsonSerializer.Deserialize<Repo>
-
-        match repo with
-        | None ->
-            qSession.Dispose()
-            // Release the queue so writer can access it
-            releasingReposQueue.Dispose()
-            gitPushIfAhead ()
-            printfn "Nothing in queue, will sleep 1s"
-            do! Async.Sleep 1000
-            return! readQueue queue
-        | Some repo ->
-            printfn "repo = %A" repo
-            // Our cleanup function does w flush of the session
-            do! handleRepoRelease (fun () -> qSession.Flush()) repo
-            qSession.Dispose()
-            // Release the queue so writer can access it
-            releasingReposQueue.Dispose()
-            // Introduce a delay to avoid secondary rate limits
-            do! Async.Sleep 5000
-            return! readQueue queue
+        gitPushIfAhead ()
+        printfn "Fetching release consumed 1 or timed out, will sleep 5s"
+        do! Async.Sleep 1000
+        return! readQueue ()
 
     }
 
 let main () =
     async {
-        let! _ = readQueue (Environment.GetEnvironmentVariable("RELEASES_QUEUE"))
+        let! _ = readQueue () |> Async.AwaitTask
         return 0
     }
 

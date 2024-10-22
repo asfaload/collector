@@ -4,12 +4,9 @@
 // It uses the Last-Modified headers to request only new notifications. When no
 // change is available, a Not Modified response is returned by github, and it doesn't
 // count regarding the requests quota.
-// When a new release is available, it sends it on the DiskQueue for another script to
-// collect the checksums of the release.
 #r "nuget: System.Data.SQLite, 1.0.119"
 #r "nuget: FsHttp"
 #r "nuget: Fsharp.Data"
-#r "nuget: DiskQueue, 1.7.1"
 #r "nuget: FsHttp.FSharpData, 14.5.1"
 #r "nuget: FSharp.SystemTextJson, 1.3.13"
 #load "lib/db.fsx"

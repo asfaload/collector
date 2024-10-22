@@ -283,7 +283,7 @@ module ChecksumsCollector =
 
         }
 
-    let getReleaseChecksums (cleanup: unit -> unit) (release: Release) (repo: Repo) =
+    let getReleaseChecksums (release: Release) (repo: Repo) =
         async {
             let! updatedRepo = updateChecksumsNames release repo
             let! optionsArray = downloadLastChecksums release updatedRepo
@@ -292,16 +292,14 @@ module ChecksumsCollector =
             if optionsArray |> Array.exists (fun o -> o.IsSome) then
                 gitCommit $"{repo.kind.ToString()}://{repo.user}/{repo.repo}" |> ignore
 
-            // Only cleanup if all went well
-            cleanup ()
         }
 
 
-    let handleRepoRelease (cleanup: unit -> unit) (repo: Repo) =
+    let handleRepoRelease (repo: Repo) =
         async {
             let! release = getLastGithubRelease repo
 
             match release with
-            | None -> cleanup ()
-            | Some release -> return! getReleaseChecksums cleanup release repo
+            | None -> ()
+            | Some release -> return! getReleaseChecksums release repo
         }

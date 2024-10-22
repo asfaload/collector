@@ -1,6 +1,5 @@
 // Script to manually download the checksums of a specific release
 // dotnet fsi manually_get_release_checksums.fsx $user $repo $release_url
-#r "nuget: DiskQueue, 1.7.1"
 #r "nuget: System.Data.SQLite, 1.0.119"
 #load "../lib/db.fsx"
 #load "../lib/Shared.fsx"
@@ -32,21 +31,26 @@ let loop () =
 
             let file = args[1]
 
-            readLines file
-            |> Seq.map (fun (l: string) -> l.Replace("https://github.com/", "").Split("/"))
-            |> Seq.map (fun a -> (a[0], a[1]))
-            |> Seq.map (fun (user, repo) ->
-                { user = user
-                  repo = repo
-                  checksums = []
-                  kind = Github })
-            |> Seq.iter (fun r ->
-                try
-                    let _created = Repos.create r.user r.repo |> Repos.run |> Async.RunSynchronously
-                    Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo
-                    printfn "inserted %s/%s" r.user r.repo
-                with e ->
-                    printfn "Exception inserting new repo: %s" e.Message)
+            do!
+                readLines file
+                |> Seq.map (fun (l: string) -> l.Replace("https://github.com/", "").Split("/"))
+                |> Seq.map (fun a -> (a[0], a[1]))
+                |> Seq.map (fun (user, repo) ->
+                    { user = user
+                      repo = repo
+                      checksums = []
+                      kind = Github })
+                |> Seq.map (fun r ->
+                    async {
+                        try
+                            let _created = Repos.create r.user r.repo |> Repos.run |> Async.RunSynchronously
+                            do! Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo |> Async.AwaitTask
+                            printfn "inserted %s/%s" r.user r.repo
+                        with e ->
+                            printfn "Exception inserting new repo: %s" e.Message
+                    })
+                |> Async.Sequential
+                |> Async.Ignore
 
             return 0
     }

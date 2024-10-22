@@ -4,22 +4,21 @@
 // It uses the Last-Modified headers to request only new notifications. When no
 // change is available, a Not Modified response is returned by github, and it doesn't
 // count regarding the requests quota.
-// When a new release is available, it sends it on the DiskQueue for another script to
+// When a new release is available, it sends it on the Queue for another script to
 // collect the checksums of the release.
 #r "nuget: System.Data.SQLite, 1.0.119"
 #load "lib/db.fsx"
 #load "lib/Shared.fsx"
+#load "lib/Queue.fsx"
 #r "nuget: FsHttp"
 #r "nuget: FsHttp"
 #r "nuget: Fsharp.Data"
-#r "nuget: DiskQueue, 1.7.1"
 #r "nuget: FSharp.SystemTextJson, 1.3.13"
 
 open System
 open System.IO
 open FsHttp
 open FSharp.Data
-open DiskQueue
 open Asfaload.Collector
 open System.Text.Json
 
@@ -27,37 +26,35 @@ open System.Text.Json
 let last_modified_file =
     Environment.GetEnvironmentVariable("NOTIFICATIONS_LAST_MODIFIED_FILE")
 
-let handleRelease (qSession: IPersistentQueueSession) (repo: Repo) =
+let handleRelease (repo: Repo) =
     printfn "registering release %A://%s/%s" repo.kind repo.user repo.repo
+    Queue.publish repo
 
-    qSession.Enqueue(repo |> JsonSerializer.Serialize |> System.Text.Encoding.ASCII.GetBytes)
+
+let releasesHandler (json: System.Text.Json.JsonElement) =
+    task {
+
+        // Access and lock queue
+        // As we `use` is, it gets disposed when becoming out of scope.
+        // We cannot keep it open, because it would prevent other processes to access it.
+        for release in (json.EnumerateArray()) do
+            let user = (release?repository?owner?login.ToString())
+            let repo = (release?repository?name.ToString())
+
+            let repo =
+                { user = user
+                  repo = repo
+                  kind = Github
+                  checksums = [] }
+
+            do! handleRelease repo
+    }
 
 
-let releasesHandler (queueName: string) (json: System.Text.Json.JsonElement) =
-
-    // Access and lock queue
-    // As we `use` is, it gets disposed when becoming out of scope.
-    // We cannot keep it open, because it would prevent other processes to access it.
-    use releasingReposQueue =
-        PersistentQueue.WaitFor(queueName, TimeSpan.FromSeconds(600))
-
-    use qSession = releasingReposQueue.OpenSession()
-
-    for release in (json.EnumerateArray()) do
-        let user = (release?repository?owner?login.ToString())
-        let repo = (release?repository?name.ToString())
-
-        let repo =
-            { user = user
-              repo = repo
-              kind = Github
-              checksums = [] }
-
-        handleRelease qSession repo
-
-    qSession.Flush()
-
-let rec getNotifications (lastModified: DateTimeOffset option) (releasesHandler: System.Text.Json.JsonElement -> unit) =
+let rec getNotifications
+    (lastModified: DateTimeOffset option)
+    (releasesHandler: System.Text.Json.JsonElement -> System.Threading.Tasks.Task<unit>)
+    =
     async {
 
         printfn "Start call at %A" DateTime.Now
@@ -145,7 +142,7 @@ let rec getNotifications (lastModified: DateTimeOffset option) (releasesHandler:
             printfn "Last-modified = %A" lastModified
             let s = response |> Response.toText
             let json = System.Text.Json.JsonDocument.Parse(s)
-            releasesHandler json.RootElement
+            do! releasesHandler json.RootElement |> Async.AwaitTask
             // Now wait until poll interval is passed
             printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
             do! sleeper |> Async.AwaitTask
@@ -167,8 +164,7 @@ let main () =
             else
                 None
 
-        let queue = Environment.GetEnvironmentVariable("RELEASES_QUEUE")
-        let! _ = getNotifications lastModified (releasesHandler queue)
+        let! _ = getNotifications lastModified releasesHandler
         return 0
     }
 
