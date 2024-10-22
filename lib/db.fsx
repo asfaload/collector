@@ -35,8 +35,9 @@ module Repos =
 
 
     let getUnsubscribedRepos =
+        // FIXME: support usernames only with digits. Due to DbFun
         query.Sql(
-            "select id,hoster,user,repo,subscribed from repos where subscribed=false;",
+            "select id,hoster,user,repo,subscribed from repos where subscribed=false and id is not 1314;",
             Params.Unit,
             Results.List<Repo>()
         )
