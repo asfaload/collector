@@ -30,7 +30,10 @@ let fromEnv = Environment.GetEnvironmentVariable
 
 let subscribeTo (page: IPage) (username: string) (repo: string) =
     async {
-        let! _response = page.GotoAsync($"https://github.com/{username}/{repo}") |> Async.AwaitTask
+        // Log url visited
+        let url = $"https://github.com/{username}/{repo}"
+        printfn "Visiting %s" url
+        let! _response = page.GotoAsync(url) |> Async.AwaitTask
 
         do!
             page
@@ -39,7 +42,9 @@ let subscribeTo (page: IPage) (username: string) (repo: string) =
             |> Async.AwaitTask
 
         do!
-            page.GetByText("Custom", PageGetByTextOptions(Exact = true)).ClickAsync()
+            // We get by label as we had a repo with `<code>Custom</code> in its readme, causing trouble
+            // with GetByText....`
+            page.GetByLabel("Custom", PageGetByLabelOptions(Exact = true)).ClickAsync()
             |> Async.AwaitTask
 
         do!
