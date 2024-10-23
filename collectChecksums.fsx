@@ -7,6 +7,7 @@
 
 #r "nuget: System.Data.SQLite, 1.0.119"
 #load "lib/db.fsx"
+#load "lib/Shared.fsx"
 #load "lib/Queue.fsx"
 #r "nuget: Octokit, 13.0.1"
 #load "lib/checksumsCollection.fsx"

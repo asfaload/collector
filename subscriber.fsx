@@ -8,6 +8,7 @@
 #r "nuget: System.Data.SQLite, 1.0.119"
 #r "nuget: Otp.NET, 1.4.0"
 #load "lib/db.fsx"
+#load "lib/Shared.fsx"
 #load "lib/Queue.fsx"
 // Getting playwright installed:
 // // Create a new project ni which you install playwright

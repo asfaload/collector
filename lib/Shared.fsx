@@ -1,6 +1,5 @@
 #r "nuget: FSharp.SystemTextJson, 1.3.13"
 #r "nuget: FsHttp"
-#load "db.fsx"
 
 namespace Asfaload.Collector
 
