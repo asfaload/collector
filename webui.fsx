@@ -57,7 +57,11 @@ let app: WebPart =
                       |> Option.map (fun (user, repo) ->
                           try
                               let created = Repos.create user repo |> Repos.run |> Async.RunSynchronously
+
                               Asfaload.Collector.Queue.triggerReleaseDownload user repo
+                              |> Async.AwaitTask
+                              |> Async.RunSynchronously
+
                               created
                           with e ->
                               printfn "Exception inserting new repo: %s" e.Message
