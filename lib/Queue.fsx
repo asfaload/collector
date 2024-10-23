@@ -13,25 +13,39 @@ module Queue =
     open FSharp.Control
 
 
+    let mutable cachedContext: INatsJSContext option = None
+    let mutable cachedStream: INatsJSStream option = None
+
     let getContext () =
-        let url = Environment.GetEnvironmentVariable("NATS_URL")
-        let nc = new NatsClient(url)
-        nc.CreateJetStreamContext()
+        match cachedContext with
+        | Some v -> v
+        | None ->
+            let url = Environment.GetEnvironmentVariable("NATS_URL")
+            let nc = new NatsClient(url)
+            let ctx = nc.CreateJetStreamContext()
+            cachedContext <- Some ctx
+            ctx
 
     let getStream () =
         task {
 
-            let js = getContext ()
-            let streamName = "RELEASES"
+            match cachedStream with
+            | Some s -> return s
+            | None ->
+                let js = getContext ()
+                let streamName = "RELEASES"
 
-            return!
-                js.CreateStreamAsync(
-                    new StreamConfig(
-                        streamName,
-                        subjects = [| "releases.>" |],
-                        Retention = StreamConfigRetention.Workqueue
+                let! s =
+                    js.CreateStreamAsync(
+                        new StreamConfig(
+                            streamName,
+                            subjects = [| "releases.>" |],
+                            Retention = StreamConfigRetention.Workqueue
+                        )
                     )
-                )
+
+                cachedStream <- Some s
+                return s
 
         }
 
@@ -47,7 +61,7 @@ module Queue =
     let consumeReleases (f: Repo -> unit) =
         task {
             let! stream = getStream ()
-            let! consumer = stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("order_processor"))
+            let! consumer = stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("releases_processor"))
 
             do!
                 consumer.FetchAsync<string>(opts = new NatsJSFetchOpts(MaxMsgs = 1))
