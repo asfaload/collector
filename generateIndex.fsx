@@ -82,6 +82,7 @@ let handleChecksumFile (path: string) : FilesChecksums =
             // This handles the case of the checksum being placed in a file named similarly to the
             // published file, but with an extension
             | [| sha |] when
+                // FIXME: add .checksum.txt extension
                 FileInfo(path).Extension.StartsWith ".sha"
                 && (FileInfo(path).Extension.EndsWith "sum"
                     || FileInfo(path).Extension.EndsWith "256"
@@ -186,10 +187,14 @@ let generateChecksumsList (rootDir: string) =
     |> Seq.iter (fun _ -> ())
 
 
-let main () =
-    let gitDir = System.Environment.GetEnvironmentVariable("BASE_DIR")
-    //getLeafDirectories gitDir |> Seq.iter (fun leaf -> printfn "%s" leaf)
-    generateChecksumsList gitDir
+let main gitDir = generateChecksumsList gitDir
 
+let args = fsi.CommandLineArgs
 
-main ()
+let directory =
+    if args |> Seq.length < 2 then
+        System.Environment.GetEnvironmentVariable("BASE_DIR")
+    else
+        args[1]
+
+main directory
