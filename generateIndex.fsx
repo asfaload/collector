@@ -45,10 +45,6 @@ let rec getLeafDirectories (root: string) =
 let handleChecksumFile (path: string) : FilesChecksums =
     File.ReadLines path
     |> Seq.map (fun line -> line.Split(" ") |> Array.filter (fun e -> e <> ""))
-    |> Seq.filter (fun a ->
-
-        let cdt = a <> [| "-----BEGIN"; "PGP"; "SIGNED"; "MESSAGE-----" |]
-        cdt)
     |> Seq.map (fun parts ->
 
         let checksum, file =
