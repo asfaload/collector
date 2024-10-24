@@ -107,8 +107,9 @@ let generateChecksumsList (rootDir: string) =
                 .ToJsonSerializerOptions()
 
         let json = JsonSerializer.Serialize(checksumsInfo, options)
-        printfn "********************* %s *********************" leafDir
-        printfn "%s" json)
+        let indexPath = Path.Combine(leafDir, ".asfaload.index.json")
+        File.WriteAllText(indexPath, json)
+        printfn "wrote %s" indexPath)
     |> Seq.iter (fun _ -> ())
 
 
