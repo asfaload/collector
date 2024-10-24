@@ -15,7 +15,7 @@ type FileChecksum =
     { fileName: string
       algo: Algo
       source: string
-      value: string }
+      hash: string }
 
 type FilesChecksums = seq<FileChecksum>
 
@@ -72,7 +72,7 @@ let handleChecksumFile (path: string) : FilesChecksums =
         { fileName = file
           algo = algo
           source = (FileInfo(path).Name)
-          value = checksum }
+          hash = checksum }
 
 
     )
@@ -97,7 +97,15 @@ let generateChecksumsList (rootDir: string) =
     getLeafDirectories rootDir
     |> Seq.map (fun leafDir ->
         let checksumsInfo = handleChecksumsFilesInLeaf leafDir
-        let options = JsonFSharpOptions.Default().ToJsonSerializerOptions()
+
+        let options =
+            JsonFSharpOptions
+                .Default()
+                // DU cases without fields are serialised as string,
+                // eg Sha256 -> "Sha256"
+                .WithUnionUnwrapFieldlessTags()
+                .ToJsonSerializerOptions()
+
         let json = JsonSerializer.Serialize(checksumsInfo, options)
         printfn "********************* %s *********************" leafDir
         printfn "%s" json)
