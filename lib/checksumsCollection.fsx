@@ -128,8 +128,21 @@ module ChecksumsCollector =
 
         // We do not re-download existing files
         if not (File.Exists filePath) then
-            get (checksumsUri.ToString()) |> Request.send |> Response.saveFile filePath
-            Some filePath
+            let response = get (checksumsUri.ToString()) |> Request.send
+
+            // Only save file if request was successful
+            // FIXME: we should also look at other successful status codes
+            if response.statusCode = Net.HttpStatusCode.OK then
+                response |> Response.saveFile filePath
+                printfn "Saved checksums file"
+                Some filePath
+            else
+                printfn
+                    "ERROR: download gave unexpected status code %A for url %s"
+                    response.statusCode
+                    (checksumsUri.ToString())
+
+                None
         else
             // If file exists, return None to stop further processing
             None
