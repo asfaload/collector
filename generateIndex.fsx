@@ -170,6 +170,7 @@ let handleChecksumsFilesInLeaf (leafDir: string) =
 
 let generateChecksumsList (rootDir: string) =
     getLeafDirectories rootDir
+    |> Seq.filter (fun dir -> not (File.Exists(Path.Combine(dir, ".asfaload.index.json"))))
     |> Seq.map (fun leafDir ->
         let checksumsInfo = handleChecksumsFilesInLeaf leafDir
 
