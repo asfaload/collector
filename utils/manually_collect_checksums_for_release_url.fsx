@@ -35,7 +35,7 @@ let main () =
             | None -> printfn "RELEASE NOT FOUND!"
             | Some release ->
                 printfn "found release"
-                do! getReleaseChecksums (fun () -> printfn "release downloaded") release repo
+                do! getReleaseChecksums release repo
 
             return 0
     }
