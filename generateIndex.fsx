@@ -174,17 +174,21 @@ let generateChecksumsList (rootDir: string) =
     |> Seq.map (fun leafDir ->
         let checksumsInfo = handleChecksumsFilesInLeaf leafDir
 
-        let options =
-            JsonFSharpOptions
-                .Default()
-                // DU cases without fields are serialised as string,
-                // eg Sha256 -> "Sha256"
-                .WithUnionUnwrapFieldlessTags()
-                .ToJsonSerializerOptions()
+        if checksumsInfo.publishedFiles |> Seq.length > 0 then
 
-        let json = JsonSerializer.Serialize(checksumsInfo, options)
-        let indexPath = Path.Combine(leafDir, ".asfaload.index.json")
-        File.WriteAllText(indexPath, json))
+            let options =
+                JsonFSharpOptions
+                    .Default()
+                    // DU cases without fields are serialised as string,
+                    // eg Sha256 -> "Sha256"
+                    .WithUnionUnwrapFieldlessTags()
+                    .ToJsonSerializerOptions()
+
+            let json = JsonSerializer.Serialize(checksumsInfo, options)
+            let indexPath = Path.Combine(leafDir, ".asfaload.index.json")
+            File.WriteAllText(indexPath, json)
+        else
+            ())
     |> Seq.iter (fun _ -> ())
 
 
