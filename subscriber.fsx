@@ -135,9 +135,9 @@ let rec subscriptionLoop (page: IPage) =
             unsubscribedRepos
             |> List.map (fun r ->
                 async {
-                    printfn "would subscribe"
-                    //let! _r = subscribeTo page r.user r.repo
-                    //Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo
+                    printfn "subscribe %s/%s" r.user r.repo
+                    let! _r = subscribeTo page r.user r.repo
+                    let! _r = Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo |> Async.AwaitTask
                     return ()
                 })
             |> Async.Sequential
