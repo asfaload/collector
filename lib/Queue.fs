@@ -1,5 +1,3 @@
-#r "nuget: NATS.Net, 2.5.2"
-#r "nuget: FSharp.Control.TaskSeq"
 namespace Asfaload.Collector
 
 module Queue =

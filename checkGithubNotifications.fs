@@ -6,14 +6,6 @@
 // count regarding the requests quota.
 // When a new release is available, it sends it on the Queue for another script to
 // collect the checksums of the release.
-#r "nuget: System.Data.SQLite, 1.0.119"
-#load "lib/db.fsx"
-#load "lib/Shared.fsx"
-#load "lib/Queue.fsx"
-#r "nuget: FsHttp"
-#r "nuget: FsHttp"
-#r "nuget: Fsharp.Data"
-#r "nuget: FSharp.SystemTextJson, 1.3.13"
 
 open System
 open System.IO
@@ -168,4 +160,4 @@ let main () =
         return 0
     }
 
-main () |> Async.RunSynchronously
+main () |> Async.RunSynchronously |> exit

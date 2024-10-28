@@ -2,14 +2,7 @@
 // in the sqlite database $REPOS_DB for entries with subscribed=false.
 // It uses Playwright to subsribe via the web interface, as it is the only way
 // to subscribe to only releases notifications.
-#r "nuget: FsHttp"
-#r "nuget: Microsoft.Playwright, 1.47.0"
-#r "nuget: FSharp.SystemTextJson, 1.3.13"
-#r "nuget: System.Data.SQLite, 1.0.119"
-#r "nuget: Otp.NET, 1.4.0"
-#load "lib/db.fsx"
-#load "lib/Shared.fsx"
-#load "lib/Queue.fsx"
+//
 // Getting playwright installed:
 // // Create a new project ni which you install playwright
 // dotnet new console -lang F#
@@ -170,7 +163,7 @@ let main () =
         return 0
     }
 
-main () |> Async.AwaitTask |> Async.RunSynchronously
+main () |> Async.AwaitTask |> Async.RunSynchronously |> exit
 ////  The REST API only allows to subsribe to all events, not only releases :-(
 //open FsHttp
 //let user = "jesseduffield"
