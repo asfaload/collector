@@ -1,9 +1,3 @@
-#r "nuget: Suave, 2.6.2"
-#r "nuget: System.Data.SQLite, 1.0.119"
-#load "lib/db.fsx"
-#load "lib/Shared.fsx"
-#load "lib/Queue.fsx"
-
 open Suave
 open Suave.Filters
 open Suave.Operators

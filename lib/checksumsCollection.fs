@@ -1,11 +1,5 @@
 namespace Asfaload.Collector
 
-#r "nuget: Octokit, 13.0.1"
-#r "nuget: FsHttp"
-#r "nuget: Fsharp.Data"
-#r "nuget: FsHttp.FSharpData, 14.5.1"
-#r "nuget: FSharp.SystemTextJson, 1.3.13"
-#r "nuget: Fli, 1.111.10"
 
 module ChecksumsCollector =
 
