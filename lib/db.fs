@@ -25,7 +25,9 @@ module Repos =
         }
 
     let createConnection () : IDbConnection =
-        new SQLiteConnection($"""Data Source={Environment.GetEnvironmentVariable("REPOS_DB")}; Journal Mode=Wal""")
+        new SQLiteConnection(
+            $"""Data Source={Environment.GetEnvironmentVariable("REPOS_DB")}; PRAGMA journal_mode=WAL"""
+        )
 
     let config = QueryConfig.Default(createConnection).SqliteDateTimeAsString()
     let query = QueryBuilder(config)
