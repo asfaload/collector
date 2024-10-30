@@ -28,6 +28,7 @@ module Index =
     type IndexFile =
         { mirroredOn: DateTime option
           publishedOn: DateTime option
+          version: int
           publishedFiles: FilesChecksums }
 
     let rec getLeafDirectories (root: string) =
@@ -165,7 +166,8 @@ module Index =
 
             |> Seq.concat
 
-        { mirroredOn = None
+        { version = 1
+          mirroredOn = None
           publishedOn = None
           publishedFiles = checksums }
 
