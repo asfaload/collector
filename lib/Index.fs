@@ -31,6 +31,8 @@ module Index =
           version: int
           publishedFiles: FilesChecksums }
 
+    let INDEX_NAME = "asfaload.index.json"
+
     let rec getLeafDirectories (root: string) =
         seq {
             // ignore hidden directories like eg .git
@@ -182,7 +184,7 @@ module Index =
         (mirroredOn: DateTimeOffset option)
         =
         getLeafDirectories rootDir
-        |> Seq.filter (fun dir -> not (File.Exists(Path.Combine(dir, ".asfaload.index.json"))))
+        |> Seq.filter (fun dir -> not (File.Exists(Path.Combine(dir, INDEX_NAME))))
         |> Seq.map (fun leafDir ->
             let checksumsInfo = handleChecksumsFilesInLeaf leafDir publishedOn mirroredOn
             printfn "%A" checksumsInfo
@@ -198,7 +200,7 @@ module Index =
                         .ToJsonSerializerOptions()
 
                 let json = JsonSerializer.Serialize(checksumsInfo, options)
-                let indexPath = Path.Combine(leafDir, ".asfaload.index.json")
+                let indexPath = Path.Combine(leafDir, INDEX_NAME)
                 printfn "will write index to %s" indexPath
                 File.WriteAllText(indexPath, json)
             else
