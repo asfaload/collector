@@ -26,8 +26,8 @@ module Index =
     type FilesChecksums = seq<FileChecksum>
 
     type IndexFile =
-        { mirroredOn: DateTime option
-          publishedOn: DateTime option
+        { mirroredOn: DateTimeOffset option
+          publishedOn: DateTimeOffset option
           version: int
           publishedFiles: FilesChecksums }
 
@@ -136,7 +136,11 @@ module Index =
         |> Seq.map (fun o -> o.Value)
 
 
-    let handleChecksumsFilesInLeaf (leafDir: string) =
+    let handleChecksumsFilesInLeaf
+        (leafDir: string)
+        (mirroredOn: DateTimeOffset option)
+        (publishedOn: DateTimeOffset option)
+        =
         let checksums =
             Directory.EnumerateFiles leafDir
             // Ignore files with usual extensions indicating it is not a checksums file
@@ -167,16 +171,21 @@ module Index =
             |> Seq.concat
 
         { version = 1
-          mirroredOn = None
-          publishedOn = None
+          mirroredOn = mirroredOn
+          publishedOn = publishedOn
           publishedFiles = checksums }
 
 
-    let generateChecksumsList (rootDir: string) =
+    let generateChecksumsList
+        (rootDir: string)
+        (publishedOn: DateTimeOffset option)
+        (mirroredOn: DateTimeOffset option)
+        =
         getLeafDirectories rootDir
         |> Seq.filter (fun dir -> not (File.Exists(Path.Combine(dir, ".asfaload.index.json"))))
         |> Seq.map (fun leafDir ->
-            let checksumsInfo = handleChecksumsFilesInLeaf leafDir
+            let checksumsInfo = handleChecksumsFilesInLeaf leafDir publishedOn mirroredOn
+            printfn "%A" checksumsInfo
 
             if checksumsInfo.publishedFiles |> Seq.length > 0 then
 

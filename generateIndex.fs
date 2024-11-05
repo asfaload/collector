@@ -1,13 +1,16 @@
-#load "lib/Index.fsx"
 open Asfaload.Collector.Index
-let main gitDir = generateChecksumsList gitDir
+open System
 
-let args = fsi.CommandLineArgs
+let main gitDir =
+    generateChecksumsList gitDir (Some DateTimeOffset.UtcNow) (Some DateTimeOffset.UtcNow)
+
+let args = System.Environment.GetCommandLineArgs()
 
 let directory =
     if args |> Seq.length < 2 then
         System.Environment.GetEnvironmentVariable("BASE_DIR")
     else
+
         args[1]
 
 main directory
