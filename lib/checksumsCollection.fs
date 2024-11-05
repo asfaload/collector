@@ -242,9 +242,18 @@ module ChecksumsCollector =
 
             let generateIndexAsync =
                 async {
-                    printfn "will generate index for downloadDir %s" downloadDir
-                    Index.generateChecksumsList downloadDir (rel.PublishedAt |> toOption) (Some DateTimeOffset.UtcNow)
-                    gitAdd downloadDir |> ignore
+                    if Directory.Exists downloadDir then
+                        printfn "will generate index for downloadDir %s" downloadDir
+
+                        Index.generateChecksumsList
+                            downloadDir
+                            (rel.PublishedAt |> toOption)
+                            (Some DateTimeOffset.UtcNow)
+
+                        gitAdd downloadDir |> ignore
+                    else
+                        printfn "not generating index for inexisting directory %s" downloadDir
+
                     return None
                 }
 
