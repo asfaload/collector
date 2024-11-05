@@ -148,6 +148,14 @@ module ChecksumsCollector =
     client.Credentials <- tokenAuth
 
 
+    let getDownloadDir (host: string) (downloadSegments: string array) =
+        downloadSegments
+        // Remove leading "/" segment, as it caused trouble when calling Path.GetRelativePath
+        |> Array.filter (fun s -> s <> "/")
+        // Set the hostname as first segment
+        |> Array.append [| host |]
+        |> Path.Combine
+
     let downloadIndividualChecksumsFile (lastUri: Uri) (downloadSegments: string array) (filename: string) =
         async {
             let checksumsSegments = Array.append downloadSegments [| filename |]
@@ -156,11 +164,7 @@ module ChecksumsCollector =
 
             let resultingOption =
                 downloadSegments
-                // Remove leading "/" segment, as it caused trouble when calling Path.GetRelativePath
-                |> Array.filter (fun s -> s <> "/")
-                // Set the hostname as first segment
-                |> Array.append [| lastUri.Host |]
-                |> Path.Combine
+                |> getDownloadDir lastUri.Host
                 |> createReleaseDir
                 |> Option.bind (downloadChecksums checksumsUri)
                 |> Option.map gitAdd
@@ -218,6 +222,9 @@ module ChecksumsCollector =
 
 
     let downloadLastChecksums (rel: Release) (r: Repo) =
+        let toOption (nullable: Nullable<_>) =
+            if nullable.HasValue then Some nullable.Value else None
+
         async {
             printfn "Running downloadLast for %s/%s" r.user r.repo
             let lastUri = System.Uri(rel.HtmlUrl)
@@ -225,14 +232,29 @@ module ChecksumsCollector =
             let downloadSegments =
                 lastUri.Segments |> Array.map (fun s -> if s = "tag/" then "download/" else s)
 
-            return!
+            let checksumsAsyncs =
                 r.checksums
                 |> List.map (fun name ->
                     async {
                         do! Async.Sleep 1000
                         return! downloadIndividualChecksumsFile lastUri downloadSegments name
                     })
-                |> Async.Sequential
+
+            let relativeDownloadDir = getDownloadDir lastUri.Host downloadSegments
+
+            let downloadDir =
+                Path.Combine(System.Environment.GetEnvironmentVariable("BASE_DIR"), relativeDownloadDir)
+
+
+            let generateIndexAsync =
+                async {
+                    printfn "will generate index for downloadDir %s" downloadDir
+                    Index.generateChecksumsList downloadDir (rel.PublishedAt |> toOption) (Some DateTimeOffset.UtcNow)
+                    gitAdd downloadDir |> ignore
+                    return None
+                }
+
+            return! List.append checksumsAsyncs [ generateIndexAsync ] |> Async.Sequential
 
         }
 
@@ -240,7 +262,7 @@ module ChecksumsCollector =
         async {
             let releaseId = rel.Id
 
-            do! Async.Sleep 60_000
+            //do! Async.Sleep 60_000
 
             let! response =
                 http {

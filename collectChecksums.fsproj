@@ -9,6 +9,7 @@
     <Compile Include="lib/db.fs" />
     <Compile Include="lib/Shared.fs" />
     <Compile Include="lib/Queue.fs" />
+    <Compile Include="lib/Index.fs" />
     <Compile Include="lib/checksumsCollection.fs" />
     <Compile Include="collectChecksums.fs" />
   </ItemGroup>

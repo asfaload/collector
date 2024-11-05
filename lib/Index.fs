@@ -199,6 +199,7 @@ module Index =
 
                 let json = JsonSerializer.Serialize(checksumsInfo, options)
                 let indexPath = Path.Combine(leafDir, ".asfaload.index.json")
+                printfn "will write index to %s" indexPath
                 File.WriteAllText(indexPath, json)
             else
                 ())
