@@ -141,7 +141,7 @@ let rec subscriptionLoop (page: IPage) =
             |> Async.Sequential
 
         printfn "%A Sleeping before next subscription loop" DateTime.Now
-        do! Async.Sleep 5000
+        do! Async.Sleep 30000
         return! subscriptionLoop page
 
     }
