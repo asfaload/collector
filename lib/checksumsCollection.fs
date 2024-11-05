@@ -20,16 +20,10 @@ module ChecksumsCollector =
     let CHECKSUMS =
         [ "checksum.txt"
           "checksums.txt"
-          "SHA256SUMS"
-          "SHA256SUMS.txt"
-          "SHA512SUMS"
-          "SHA512SUMS.txt"
+          "sha512"
+          "sha256"
           "SHASUMS256"
-          "SHASUMS256.txt"
-          "SHASUMS512.txt"
           "SHASUMS512"
-          //DataDog/dd-trace-dotnet
-          "sha512.txt"
           // Neovim's approach:
           ".*\.sha256sum" ]
 
