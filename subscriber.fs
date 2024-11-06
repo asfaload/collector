@@ -80,32 +80,59 @@ let firefoxPage () =
         return page, context
     }
 
-let login (context: IBrowserContext) (page: IPage) =
+let fill2FA (page: IPage) =
     task {
-        let! _response = page.GotoAsync("https://github.com/login")
-        // Interact with login form
-        do!
-            page
-                .GetByLabel("Username or email address")
-                .FillAsync(fromEnv "WATCHER_USERNAME")
-
-        do! page.GetByLabel("Password").FillAsync(fromEnv "WATCHER_PASSWORD")
-
-
-        do!
-            page
-                .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Sign in", Exact = true))
-                .ClickAsync()
-
         let totp =
             Totp(Environment.GetEnvironmentVariable("TOTP_KEY") |> Base32Encoding.ToBytes)
 
         let totpCode = totp.ComputeTotp()
         do! page.GetByPlaceholder("XXXXXX").FillAsync(totpCode)
 
-        do! page.WaitForURLAsync("https://github.com/")
-        // This saves the contect to disk, what a weird api....
-        let! state = context.StorageStateAsync(BrowserContextStorageStateOptions(Path = browserStatePath))
+    }
+
+let login (context: IBrowserContext) (page: IPage) =
+    task {
+        let verify2FAText = "Verify 2FA now"
+        let! verify2FA = page.GetByText(verify2FAText).IsVisibleAsync()
+
+        if verify2FA then
+            do!
+                page
+                    .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = verify2FAText, Exact = true))
+                    .ClickAsync()
+
+            do! fill2FA page
+
+            do!
+                page
+                    .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Done", Exact = true))
+                    .ClickAsync()
+
+            do! page.WaitForURLAsync("https://github.com/")
+            ()
+        else
+
+            let! _response = page.GotoAsync("https://github.com/login")
+            // Interact with login form
+            do!
+                page
+                    .GetByLabel("Username or email address")
+                    .FillAsync(fromEnv "WATCHER_USERNAME")
+
+            do! page.GetByLabel("Password").FillAsync(fromEnv "WATCHER_PASSWORD")
+
+
+            do!
+                page
+                    .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Sign in", Exact = true))
+                    .ClickAsync()
+
+            do! fill2FA page
+            do! page.WaitForURLAsync("https://github.com/")
+            // This saves the contect to disk, what a weird api....
+            let! state = context.StorageStateAsync(BrowserContextStorageStateOptions(Path = browserStatePath))
+            ()
+
         return page
     }
 
