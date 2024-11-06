@@ -290,7 +290,7 @@ module ChecksumsCollector =
                         CHECKSUMS
                         |> List.exists (fun chk ->
                             let regex = Regex(chk)
-                            regex.IsMatch(a?name.AsString())))
+                            Regex.IsMatch(a?name.ToString(), chk, RegexOptions.IgnoreCase)))
                     |> Array.map (fun a -> a?name.AsString())
                     |> Array.toList
 
