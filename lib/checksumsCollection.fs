@@ -265,7 +265,8 @@ module ChecksumsCollector =
         async {
             let releaseId = rel.Id
 
-            do! Async.Sleep 60_000
+            if (isNull (Environment.GetEnvironmentVariable("DEBUG"))) then
+                do! Async.Sleep 60_000
 
             let! response =
                 http {
