@@ -17,15 +17,7 @@ module ChecksumsCollector =
 
 
 
-    let CHECKSUMS =
-        [ "checksum.txt"
-          "checksums.txt"
-          "sha512"
-          "sha256"
-          "SHASUMS256"
-          "SHASUMS512"
-          // Neovim's approach:
-          ".*\.sha256sum" ]
+    let CHECKSUMS = ChecksumHelpers.CHECKSUMS
 
     let gitMutex = new System.Threading.Mutex()
 
@@ -285,6 +277,7 @@ module ChecksumsCollector =
             | Net.HttpStatusCode.OK ->
                 let json = response |> Response.toJson
 
+                // FIXME: this is all duplicated from Shared.fs
                 let checksumsFiles =
                     json.AsArray()
                     |> Array.filter (fun a ->
