@@ -140,8 +140,8 @@ module Index =
 
     let handleChecksumsFilesInLeaf
         (leafDir: string)
-        (mirroredOn: DateTimeOffset option)
         (publishedOn: DateTimeOffset option)
+        (mirroredOn: DateTimeOffset option)
         =
         let checksums =
             Directory.EnumerateFiles leafDir
