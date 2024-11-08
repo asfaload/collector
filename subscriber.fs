@@ -61,7 +61,12 @@ let firefoxAsync () =
     task {
         let! playwright = Playwright.CreateAsync()
         let firefox = playwright.Firefox
-        let! browser = firefox.LaunchAsync(BrowserTypeLaunchOptions(Headless = true))
+
+        let! browser =
+            firefox.LaunchAsync(
+                BrowserTypeLaunchOptions(Headless = (isNull (Environment.GetEnvironmentVariable("DEBUG"))))
+            )
+
         return browser
 
     }
