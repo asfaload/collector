@@ -155,7 +155,7 @@ let login (context: IBrowserContext) (page: IPage) =
 // Checks if user is logged in. Changes url of the page!
 let isLoggedIn (page: IPage) =
     task {
-        let! _response = page.GotoAsync("https://github.com/")
+        let! _response = page.GotoAsync("https://github.com/login")
         //return! page.Locator("strong").GetByText(("Dashboard")).IsVisibleAsync()
         return!
             page
