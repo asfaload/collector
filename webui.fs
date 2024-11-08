@@ -65,6 +65,8 @@ let app: WebPart =
                   | Some [ r ] -> Successful.OK $"""Insert repo {sprintf "%A" r}<br/>{form}"""
                   | _ -> Suave.ServerErrors.INTERNAL_ERROR $"An error occurred<br/>{form}"
               | _ -> Suave.RequestErrors.FORBIDDEN "Provide authentication code")
+          // Post with curl:
+          // curl -X POST -d '{"user":"asfaload","repo":"asfald"}' https://collector.asfaload.com/register
           POST
           >=> path "/register"
           >=> (mapJson (fun (info: RepoToRegister) ->
