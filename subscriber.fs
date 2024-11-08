@@ -22,6 +22,9 @@ open Asfaload.Collector.DB
 let browserStatePath = Environment.GetEnvironmentVariable("PLAYWRIGHT_STATE")
 let fromEnv = Environment.GetEnvironmentVariable
 
+let debugging () =
+    not (isNull (Environment.GetEnvironmentVariable("DEBUG")))
+
 let subscribeTo (page: IPage) (username: string) (repo: string) =
     async {
         // Log url visited
@@ -62,10 +65,7 @@ let firefoxAsync () =
         let! playwright = Playwright.CreateAsync()
         let firefox = playwright.Firefox
 
-        let! browser =
-            firefox.LaunchAsync(
-                BrowserTypeLaunchOptions(Headless = (isNull (Environment.GetEnvironmentVariable("DEBUG"))))
-            )
+        let! browser = firefox.LaunchAsync(BrowserTypeLaunchOptions(Headless = not (debugging ())))
 
         return browser
 
@@ -80,7 +80,15 @@ let firefoxPage () =
         if not (File.Exists(browserStatePath)) then
             File.WriteAllText(browserStatePath, """{"cookies":[],"origins":[]}""")
 
-        let! context = browser.NewContextAsync(BrowserNewContextOptions(StorageStatePath = browserStatePath))
+        let options =
+            if debugging () then
+                BrowserNewContextOptions(StorageStatePath = browserStatePath, RecordVideoDir = "videos/")
+            else
+                BrowserNewContextOptions(StorageStatePath = browserStatePath)
+
+
+        let! context = browser.NewContextAsync(options)
+
         let! page = context.NewPageAsync()
         return page, context
     }
@@ -113,7 +121,7 @@ let login (context: IBrowserContext) (page: IPage) =
                     .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Done", Exact = true))
                     .ClickAsync()
 
-            do! page.WaitForURLAsync("https://github.com/")
+            do! page.WaitForURLAsync("https://githubfhdjslhfjdlsfdkljs.com/")
             ()
         else
 
@@ -182,17 +190,29 @@ let main () =
     task {
         let! page, context = firefoxPage ()
 
-        match! isLoggedIn (page) with
-        | true -> printfn "logged in!"
-        | false ->
-            printfn "logging in"
-            let! _ = login context page
-            ()
+        let bodyAsync =
+            task {
+                match! isLoggedIn (page) with
+                | true -> printfn "logged in!"
+                | false ->
+                    printfn "logging in"
+                    let! _ = login context page
+                    ()
 
-        let! _r = subscriptionLoop page
+                return! subscriptionLoop page
+            }
+            |> Async.AwaitTask
 
+        let! res = bodyAsync |> Async.Catch
 
-        return 0
+        match res with
+        | Choice1Of2 r -> return 0
+        | Choice2Of2 exc ->
+            // Close page and context for videos to be saved
+            do! page.CloseAsync()
+            do! context.CloseAsync()
+            printfn "Caught exception %s:\n%s" exc.Message exc.StackTrace
+            return 1
     }
 
 main () |> Async.AwaitTask |> Async.RunSynchronously |> exit
@@ -214,4 +234,5 @@ main () |> Async.AwaitTask |> Async.RunSynchronously |> exit
 //}
 //|> Request.send
 //}
+//|> Request.send
 //|> Request.send
