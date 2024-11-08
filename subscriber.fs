@@ -143,7 +143,24 @@ let login (context: IBrowserContext) (page: IPage) =
                     .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Sign in", Exact = true))
                     .ClickAsync()
 
-            do! fill2FA page
+            // Sometimes GH tells us that the account we tried to add was already logged in.
+            // At the time of writing this can be detected with this text, however I decided to detect
+            // it by the present of a Select button used to switch to the already logged in account.
+            //let! addingAccount =
+            //    page
+            //        .GetByText("The account you were attempting to add has allready been added")
+            //        .IsVisibleAsync()
+
+            let selectAccountButton =
+                page.GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Select", Exact = true))
+
+            let! accountAlreadyAdded = selectAccountButton.IsVisibleAsync()
+
+            if accountAlreadyAdded then
+                do! selectAccountButton.ClickAsync()
+            else
+                do! fill2FA page
+
             do! page.WaitForURLAsync("https://github.com/")
             // This saves the contect to disk, what a weird api....
             let! state = context.StorageStateAsync(BrowserContextStorageStateOptions(Path = browserStatePath))
