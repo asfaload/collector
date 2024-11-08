@@ -191,6 +191,7 @@ let rec subscriptionLoop (page: IPage) =
                     printfn "subscribe %s/%s" r.user r.repo
                     let! _r = subscribeTo page r.user r.repo
                     let! _r = Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo |> Async.AwaitTask
+                    do! Async.Sleep 5000
                     return ()
                 })
             |> Async.Sequential
