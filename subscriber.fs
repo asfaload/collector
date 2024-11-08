@@ -25,6 +25,9 @@ let fromEnv = Environment.GetEnvironmentVariable
 let debugging () =
     not (isNull (Environment.GetEnvironmentVariable("DEBUG")))
 
+let recorVideos () =
+    not (isNull (Environment.GetEnvironmentVariable("VIDEOS")))
+
 let subscribeTo (page: IPage) (username: string) (repo: string) =
     async {
         // Log url visited
@@ -81,7 +84,7 @@ let firefoxPage () =
             File.WriteAllText(browserStatePath, """{"cookies":[],"origins":[]}""")
 
         let options =
-            if debugging () then
+            if recorVideos () then
                 BrowserNewContextOptions(StorageStatePath = browserStatePath, RecordVideoDir = "videos/")
             else
                 BrowserNewContextOptions(StorageStatePath = browserStatePath)
