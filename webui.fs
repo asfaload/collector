@@ -71,6 +71,17 @@ let app: WebPart =
           >=> path "/v1/register_github_release"
           >=> (mapJson (fun (repo: RepoToRegister) ->
               async {
+                  // FIXME: add DoS protection:
+                  // - We can authenticate requests coming from a github action:
+                  // https://gal.hagever.com/posts/authenticating-github-actions-requests-with-github-openid-connect
+                  // https://github.com/Schniz/benchy-action
+                  // https://stackoverflow.com/questions/58601556/how-to-validate-jwt-token-using-jwks-in-dot-net-core
+                  // https://stackoverflow.com/questions/40623346/how-do-i-validate-a-jwt-using-jwtsecuritytokenhandler-and-a-jwks-endpoint/64274938#64274938
+                  // https://www.nuget.org/packages/microsoft.identitymodel.jsonwebtokens/
+                  // https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect#adding-permissions-settings
+                  // https://stackoverflow.com/questions/72183048/what-is-the-permission-scope-of-id-token-in-github-action
+                  //
+                  // - limit number of releases a project can do
                   let work =
                       async {
                           let! created = Repos.create repo.user repo.repo |> Repos.run
@@ -96,6 +107,7 @@ let app: WebPart =
           >=> path "/v1/track_github_repo"
           >=> (mapJson (fun (info: RepoToRegister) ->
               async {
+                  // FIXME: add DoS protection:
                   printfn "register %s/%s" info.user info.repo
 
                   match! getReleasesForRepo $"{info.user}/{info.repo}" with
