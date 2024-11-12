@@ -40,7 +40,7 @@ let app: WebPart =
     choose
         [ GET >=> path "/" >=> OK form
           POST
-          >=> path "/add"
+          >=> path "/notify_github_release"
           >=> request (fun req ->
               match req["auth"] with
               | Some "1348LLN" ->
@@ -66,9 +66,34 @@ let app: WebPart =
                   | _ -> Suave.ServerErrors.INTERNAL_ERROR $"An error occurred<br/>{form}"
               | _ -> Suave.RequestErrors.FORBIDDEN "Provide authentication code")
           // Post with curl:
-          // curl -X POST -d '{"user":"asfaload","repo":"asfald"}' https://collector.asfaload.com/register
+          // curl -X POST -d '{"user":"asfaload","repo":"asfald"}' https://collector.asfaload.com/v1/register_github_release
           POST
-          >=> path "/register"
+          >=> path "/v1/register_github_release"
+          >=> (mapJson (fun (repo: RepoToRegister) ->
+              async {
+                  let work =
+                      async {
+                          let! created = Repos.create repo.user repo.repo |> Repos.run
+                          do! Asfaload.Collector.Queue.triggerReleaseDownload repo.user repo.repo
+                          return created
+                      }
+
+                  let! result = work |> Async.Catch
+
+                  match result with
+                  | Choice1Of2 _r ->
+                      return
+                          Successful.OK
+                              $$"""{"status":"OK", "msg":"Registered release, checksums of last release from {{repo.user}}/{{repo.repo}} will be downloaded"}"""
+
+                  | Choice2Of2 exc ->
+                      printfn "%s:\n%s" (exc.Message) (exc.StackTrace)
+                      return Suave.ServerErrors.INTERNAL_ERROR """{"status":"ERROR"} """
+              }))
+          // Post with curl:
+          // curl -X POST -d '{"user":"asfaload","repo":"asfald"}' https://collector.asfaload.com/v1/track_github_repo
+          POST
+          >=> path "/v1/track_github_repo"
           >=> (mapJson (fun (info: RepoToRegister) ->
               async {
                   printfn "register %s/%s" info.user info.repo
