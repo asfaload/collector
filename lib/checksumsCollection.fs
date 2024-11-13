@@ -260,50 +260,19 @@ module ChecksumsCollector =
             if (isNull (Environment.GetEnvironmentVariable("DEBUG"))) then
                 do! Async.Sleep 60_000
 
-            let! response =
-                http {
-                    GET $"https://api.github.com/repos/{repo.user}/{repo.repo}/releases/{releaseId}/assets"
-                    Accept "application/vnd.github+json"
-                    UserAgent "asfaload-collector"
-                    //AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
-                    header "X-GitHub-Api-Version" "2022-11-28"
-                //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
-                }
-                |> Request.sendAsync
-            // Ensure we avoid secundary rate limits
-            do! Async.Sleep 1000
+            // FIXME: check duplication with Shared
+            let checksumsFiles =
+                rel.Assets
+                |> Seq.map (fun a -> a.Name)
+                |> Seq.filter (fun assetName ->
+                    CHECKSUMS
+                    |> List.exists (fun chk ->
+                        let regex = Regex(chk)
+                        Regex.IsMatch(assetName, chk, RegexOptions.IgnoreCase)))
+                |> Seq.toList
 
-            match response.statusCode with
-            | Net.HttpStatusCode.OK ->
-                let json = response |> Response.toJson
-
-                // FIXME: this is all duplicated from Shared.fs
-                let checksumsFiles =
-                    json.AsArray()
-                    |> Array.filter (fun a ->
-                        CHECKSUMS
-                        |> List.exists (fun chk ->
-                            let regex = Regex(chk)
-                            Regex.IsMatch(a?name.ToString(), chk, RegexOptions.IgnoreCase)))
-                    |> Array.map (fun a -> a?name.AsString())
-                    |> Array.toList
-
-                printfn "found checksums files %A" checksumsFiles
-                return { repo with checksums = checksumsFiles }
-            | _ ->
-                printfn
-                    "%s we got an error for %s/%s: %s!\n%s\nWe sleep one hour.\n retry-after= %s "
-                    (DateTime.Now.ToString())
-                    (repo.user)
-                    (repo.repo)
-                    (response.reasonPhrase)
-                    (response.statusCode.ToString())
-                    (response.headers.TryGetValues "retry-after"
-                     |> (fun (present, values) -> if present then (Some(values |> Seq.head)) else None)
-                     |> Option.defaultValue "Absent")
-
-                do! Async.Sleep 3600_000
-                return repo
+            printfn "found checksums files %A" checksumsFiles
+            return { repo with checksums = checksumsFiles }
 
         }
 
