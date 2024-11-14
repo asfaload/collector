@@ -1,3 +1,5 @@
 bin
 obj
 private
+node_modules
+validate_jwt
