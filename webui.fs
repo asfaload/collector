@@ -6,6 +6,7 @@ open Suave.Json
 open Asfaload.Collector.DB
 open Asfaload.Collector.ChecksumHelpers
 open System.Runtime.Serialization
+open Fli
 
 [<DataContract>]
 type RepoToRegister =
@@ -36,6 +37,31 @@ user/repo: <input type="text" name="repo" placeholder="user/repo"></input><br/>
 </body>
 """
 
+
+
+open FSharp.Data
+
+type JwtPayload = JsonProvider<"lib/ReleaseActionJwtPayloadSample.json">
+
+
+let jwt_validate = System.Environment.GetEnvironmentVariable("JWT_VALIDATOR_PATH")
+
+let authoriseActionCall (jwt: string) : (JwtPayload.Root option) =
+    let output =
+        cli {
+            Exec jwt_validate
+            Arguments [ jwt ]
+        }
+        |> Command.execute
+
+    match output.Error with
+    | Some error ->
+        printfn "jwt validation error:\n%s" error
+        None
+    | None -> output |> Output.toText |> JwtPayload.Parse |> Some
+
+
+
 let app: WebPart =
     choose
         [ GET >=> path "/" >=> OK form
@@ -65,6 +91,17 @@ let app: WebPart =
                   | Some [ r ] -> Successful.OK $"""Insert repo {sprintf "%A" r}<br/>{form}"""
                   | _ -> Suave.ServerErrors.INTERNAL_ERROR $"An error occurred<br/>{form}"
               | _ -> Suave.RequestErrors.FORBIDDEN "Provide authentication code")
+          POST
+          >=> path "/v1/github_action_register_release"
+          >=> request (fun req ->
+              req["Authorization"]
+              |> Option.bind authoriseActionCall
+              |> Option.map (fun repo ->
+                  // register release for repo
+                  Successful.OK "Success")
+              |> Option.defaultValue (RequestErrors.FORBIDDEN "Invalid Jwt")
+
+          )
           // Post with curl:
           // curl -X POST -d '{"user":"asfaload","repo":"asfald"}' https://collector.asfaload.com/v1/register_github_release
           POST
@@ -137,4 +174,6 @@ let cfg =
         bindings = [ HttpBinding.createSimple HTTP "0.0.0.0" 8080 ]
         listenTimeout = System.TimeSpan.FromMilliseconds 3000. }
 
+startWebServer cfg app
+startWebServer cfg app
 startWebServer cfg app

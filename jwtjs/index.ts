@@ -21,4 +21,4 @@ let token = Bun.argv[2];
 
 let result = await validateToken(token);
 
-console.log(result.repository)
+console.log(JSON.stringify(result))
