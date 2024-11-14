@@ -33,33 +33,38 @@ let subscribeTo (page: IPage) (username: string) (repo: string) =
         // Log url visited
         let url = $"https://github.com/{username}/{repo}"
         printfn "Visiting %s" url
-        let! _response = page.GotoAsync(url) |> Async.AwaitTask
+        let! response = page.GotoAsync(url) |> Async.AwaitTask
 
-        do!
-            page
-                .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Watch"))
-                .ClickAsync()
-            |> Async.AwaitTask
 
-        do!
-            // We get by label as we had a repo with `<code>Custom</code> in its readme, causing trouble
-            // with GetByText....`
-            page.GetByLabel("Custom", PageGetByLabelOptions(Exact = true)).ClickAsync()
-            |> Async.AwaitTask
+        if response.Ok then
+            do!
+                page
+                    .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Watch"))
+                    .ClickAsync()
+                |> Async.AwaitTask
 
-        do!
-            page
-                .GetByRole(AriaRole.Checkbox, PageGetByRoleOptions(Name = "Releases", Exact = true))
-                .CheckAsync()
-            |> Async.AwaitTask
+            do!
+                // We get by label as we had a repo with `<code>Custom</code> in its readme, causing trouble
+                // with GetByText....`
+                page.GetByLabel("Custom", PageGetByLabelOptions(Exact = true)).ClickAsync()
+                |> Async.AwaitTask
 
-        do!
-            page
-                .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Apply", Exact = true))
-                .ClickAsync()
-            |> Async.AwaitTask
+            do!
+                page
+                    .GetByRole(AriaRole.Checkbox, PageGetByRoleOptions(Name = "Releases", Exact = true))
+                    .CheckAsync()
+                |> Async.AwaitTask
 
-        return true
+            do!
+                page
+                    .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Apply", Exact = true))
+                    .ClickAsync()
+                |> Async.AwaitTask
+
+            return true
+        else
+            printfn "Got non-Ok response when visiting page %s" url
+            return false
 
     }
 
@@ -189,8 +194,12 @@ let rec subscriptionLoop (page: IPage) =
             |> List.map (fun r ->
                 async {
                     printfn "subscribe %s/%s" r.user r.repo
-                    let! _r = subscribeTo page r.user r.repo
-                    let! _r = Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo |> Async.AwaitTask
+                    let! isSubsbscribed = subscribeTo page r.user r.repo
+
+                    if isSubsbscribed then
+                        let! _r = Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo |> Async.AwaitTask
+                        ()
+
                     do! Async.Sleep 5000
                     return ()
                 })
