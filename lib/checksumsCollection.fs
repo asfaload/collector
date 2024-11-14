@@ -207,7 +207,7 @@ module ChecksumsCollector =
         }
 
 
-    let downloadLastChecksums (rel: Release) (r: Repo) =
+    let downloadReleaseChecksums (rel: Release) (r: Repo) =
         let toOption (nullable: Nullable<_>) =
             if nullable.HasValue then Some nullable.Value else None
 
@@ -279,7 +279,7 @@ module ChecksumsCollector =
     let getReleaseChecksums (release: Release) (repo: Repo) =
         async {
             let! updatedRepo = updateChecksumsNames release repo
-            let! optionsArray = downloadLastChecksums release updatedRepo
+            let! optionsArray = downloadReleaseChecksums release updatedRepo
 
             // If we downloaded a new checksums file, we need to commit
             if optionsArray |> Array.exists (fun o -> o.IsSome) then
