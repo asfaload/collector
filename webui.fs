@@ -42,6 +42,7 @@ user/repo: <input type="text" name="repo" placeholder="user/repo"></input><br/>
 open FSharp.Data
 
 type JwtPayload = JsonProvider<"lib/ReleaseActionJwtPayloadSample.json">
+type ReleaseCallbackBody = JsonProvider<"lib/ReleaseActionBodySample.json">
 
 
 let jwt_validate = System.Environment.GetEnvironmentVariable("JWT_VALIDATOR_PATH")
@@ -60,6 +61,17 @@ let authoriseActionCall (jwt: string) : (JwtPayload.Root option) =
         None
     | None -> output |> Output.toText |> JwtPayload.Parse |> Some
 
+
+let validateJwt (ctx: HttpContext) =
+    async.Return(
+        ctx.request["Authorization"]
+        // if token is invalid, authoriseActionCall will return None
+        // which will stop the pipeline
+        |> Option.bind authoriseActionCall
+        // If the call was Successful, we return the wrapped context to
+        // continue the pipeline
+        |> Option.map (fun _ -> ctx)
+    )
 
 
 let app: WebPart =
@@ -93,13 +105,10 @@ let app: WebPart =
               | _ -> Suave.RequestErrors.FORBIDDEN "Provide authentication code")
           POST
           >=> path "/v1/github_action_register_release"
+          >=> validateJwt
           >=> request (fun req ->
-              req["Authorization"]
-              |> Option.bind authoriseActionCall
-              |> Option.map (fun repo ->
-                  // register release for repo
-                  Successful.OK "Success")
-              |> Option.defaultValue (RequestErrors.FORBIDDEN "Invalid Jwt")
+
+              Successful.OK "Ok"
 
           )
           // Post with curl:
