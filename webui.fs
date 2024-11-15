@@ -58,7 +58,8 @@ let authoriseActionCall (jwt: string) : (Asfaload.Collector.JwtPayload.Root opti
 
 let validateJwt (ctx: HttpContext) =
     async.Return(
-        ctx.request["Authorization"]
+
+        ctx.request.header "Authorization"
         // if token is invalid, authoriseActionCall will return None
         // which will stop the pipeline
         |> Option.bind authoriseActionCall
