@@ -39,15 +39,9 @@ user/repo: <input type="text" name="repo" placeholder="user/repo"></input><br/>
 
 
 
-open FSharp.Data
-
-type JwtPayload = JsonProvider<"lib/ReleaseActionJwtPayloadSample.json">
-type ReleaseCallbackBody = JsonProvider<"lib/ReleaseActionBodySample.json">
-
-
 let jwt_validate = System.Environment.GetEnvironmentVariable("JWT_VALIDATOR_PATH")
 
-let authoriseActionCall (jwt: string) : (JwtPayload.Root option) =
+let authoriseActionCall (jwt: string) : (Asfaload.Collector.JwtPayload.Root option) =
     let output =
         cli {
             Exec jwt_validate
@@ -59,7 +53,7 @@ let authoriseActionCall (jwt: string) : (JwtPayload.Root option) =
     | Some error ->
         printfn "jwt validation error:\n%s" error
         None
-    | None -> output |> Output.toText |> JwtPayload.Parse |> Some
+    | None -> output |> Output.toText |> Asfaload.Collector.JwtPayload.Parse |> Some
 
 
 let validateJwt (ctx: HttpContext) =
@@ -90,7 +84,7 @@ let app: WebPart =
                           try
                               let created = Repos.create user repo |> Repos.run |> Async.RunSynchronously
 
-                              Asfaload.Collector.Queue.triggerReleaseDownload user repo
+                              Asfaload.Collector.Queue.triggerRepoReleaseDownload user repo
                               |> Async.AwaitTask
                               |> Async.RunSynchronously
 
@@ -107,6 +101,21 @@ let app: WebPart =
           >=> path "/v1/github_action_register_release"
           >=> validateJwt
           >=> request (fun req ->
+
+              let body =
+                  req.rawForm
+                  |> System.Text.Encoding.ASCII.GetString
+                  |> Asfaload.Collector.ReleaseCallbackBody.Parse
+
+              let user = body.Repository.Owner.Login
+              let repo = body.Repository.Name
+
+              Asfaload.Collector.Queue.publishCallbackRelease
+                  user
+                  repo
+                  (req.rawForm |> System.Text.Encoding.ASCII.GetString)
+              |> Async.AwaitTask
+              |> Async.RunSynchronously
 
               Successful.OK "Ok"
 
@@ -131,7 +140,7 @@ let app: WebPart =
                   let work =
                       async {
                           let! created = Repos.create repo.user repo.repo |> Repos.run
-                          do! Asfaload.Collector.Queue.triggerReleaseDownload repo.user repo.repo
+                          do! Asfaload.Collector.Queue.triggerRepoReleaseDownload repo.user repo.repo
                           return created
                       }
 

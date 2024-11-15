@@ -19,6 +19,16 @@ type Repo =
       repo: string
       checksums: string list }
 
+open FSharp.Data
+
+type JwtPayload = JsonProvider<"utils/ReleaseActionJwtPayloadSample.json">
+type ReleaseCallbackBody = JsonProvider<"utils/ReleaseActionBodySample.json">
+
+
+type ReleaseInfo =
+    | OctokitRelease of Octokit.Release
+    | CallbackRelease of ReleaseCallbackBody.Release
+
 module ChecksumHelpers =
 
     let CHECKSUMS =

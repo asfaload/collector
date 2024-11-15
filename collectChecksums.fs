@@ -11,7 +11,15 @@ open Asfaload.Collector
 
 let rec readQueue () =
     async {
-        // This will wait until the queue can be locked.
+
+        do!
+            Queue.consumeCallbackRelease (fun callbackBody ->
+                printfn "running callbackRelease %s" (callbackBody.Repository.FullName)
+                handleCallbackRelease callbackBody |> Async.RunSynchronously)
+            |> Async.AwaitTask
+
+        do! Async.Sleep 5000
+
         do!
             Queue.consumeRepoReleases (fun repo ->
                 printfn "repo = %A" repo
@@ -20,7 +28,7 @@ let rec readQueue () =
 
         gitPushIfAhead ()
         printfn "Fetching release consumed 1 or timed out, will sleep 5s"
-        do! Async.Sleep 1000
+        do! Async.Sleep 5000
         return! readQueue ()
 
     }

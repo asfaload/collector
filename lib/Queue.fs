@@ -9,6 +9,7 @@ module Queue =
     open NATS.Client.JetStream.Models
     open NATS.Net
     open FSharp.Control
+    open FSharp.Data
 
 
     let mutable cachedContext: INatsJSContext option = None
@@ -59,6 +60,9 @@ module Queue =
             ($"releases.new.{repo.user}/{repo.repo}")
             (repo |> JsonSerializer.Serialize)
 
+    let publishCallbackRelease user repo (callbackBody: string) =
+        publishToQueue "RELEASES_CALLBACK" [| "releases_callback.>" |] ($"releases.new.{user}/{repo}") callbackBody
+
     let consumeRepoReleases (f: Repo -> unit) =
         task {
             let! stream = getStream "RELEASES" [| "releases.>" |]
@@ -68,6 +72,21 @@ module Queue =
                 consumer.FetchAsync<string>(opts = new NatsJSFetchOpts(MaxMsgs = 1))
                 |> TaskSeq.iter (fun jmsg ->
                     f (jmsg.Data |> JsonSerializer.Deserialize<Repo>)
+                    jmsg.AckAsync().AsTask() |> Async.AwaitTask |> Async.RunSynchronously)
+
+            printfn "after fetch async"
+
+        }
+
+    let consumeCallbackRelease (f: ReleaseCallbackBody.Root -> unit) =
+        task {
+            let! stream = getStream "RELEASES_CALLBACK" [| "releases_callback.>" |]
+            let! consumer = stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("releases_callback_processor"))
+
+            do!
+                consumer.FetchAsync<string>(opts = new NatsJSFetchOpts(MaxMsgs = 1))
+                |> TaskSeq.iter (fun jmsg ->
+                    f (jmsg.Data |> ReleaseCallbackBody.Parse)
                     jmsg.AckAsync().AsTask() |> Async.AwaitTask |> Async.RunSynchronously)
 
             printfn "after fetch async"

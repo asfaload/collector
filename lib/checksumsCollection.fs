@@ -207,13 +207,24 @@ module ChecksumsCollector =
         }
 
 
-    let downloadReleaseChecksums (rel: Release) (r: Repo) =
+    let downloadReleaseChecksums (releaseInfo: ReleaseInfo) (r: Repo) =
         let toOption (nullable: Nullable<_>) =
             if nullable.HasValue then Some nullable.Value else None
 
         async {
             printfn "Running downloadLast for %s/%s" r.user r.repo
-            let lastUri = System.Uri(rel.HtmlUrl)
+
+            let htmlUrl =
+                match releaseInfo with
+                | OctokitRelease rel -> rel.HtmlUrl
+                | CallbackRelease rel -> rel.HtmlUrl
+
+            let publishedAt =
+                match releaseInfo with
+                | OctokitRelease rel -> rel.PublishedAt |> toOption
+                | CallbackRelease rel -> rel.PublishedAt |> Some
+
+            let lastUri = System.Uri(htmlUrl)
 
             let downloadSegments =
                 lastUri.Segments |> Array.map (fun s -> if s = "tag/" then "download/" else s)
@@ -237,10 +248,7 @@ module ChecksumsCollector =
                     if Directory.Exists downloadDir then
                         printfn "will generate index for downloadDir %s" downloadDir
 
-                        Index.generateChecksumsList
-                            downloadDir
-                            (rel.PublishedAt |> toOption)
-                            (Some DateTimeOffset.UtcNow)
+                        Index.generateChecksumsList downloadDir publishedAt (Some DateTimeOffset.UtcNow)
 
                         gitAdd downloadDir |> ignore
                     else
@@ -253,14 +261,18 @@ module ChecksumsCollector =
 
         }
 
-    let updateChecksumsNames (rel: Release) (repo: Repo) =
+    let updateChecksumsNames (releaseInfo: ReleaseInfo) (repo: Repo) =
         async {
 
             if (isNull (Environment.GetEnvironmentVariable("DEBUG"))) then
                 do! Async.Sleep 60_000
 
-            let checksumsFiles =
-                rel.Assets |> Seq.map (fun a -> a.Name) |> ChecksumHelpers.filterChecksums
+            let assetNames =
+                match releaseInfo with
+                | OctokitRelease rel -> rel.Assets |> Seq.map (fun a -> a.Name)
+                | CallbackRelease rel -> rel.Assets |> Seq.map (fun a -> a.Name)
+
+            let checksumsFiles = assetNames |> ChecksumHelpers.filterChecksums
 
             printfn "found checksums files %A" checksumsFiles
             return { repo with checksums = checksumsFiles }
@@ -314,7 +326,7 @@ module ChecksumsCollector =
 
         }
 
-    let getReleaseChecksums (release: Release) (repo: Repo) =
+    let getReleaseChecksums (release: ReleaseInfo) (repo: Repo) =
         async {
             let! updatedRepo = updateChecksumsNames release repo
             let! optionsArray = downloadReleaseChecksums release updatedRepo
@@ -334,7 +346,7 @@ module ChecksumsCollector =
                   checksums = [] }
 
             let! release = client.Repository.Release.Get(user, repoName, releaseId)
-            do! getReleaseChecksums release repo
+            do! getReleaseChecksums (OctokitRelease release) repo
             ()
         }
 
@@ -345,5 +357,14 @@ module ChecksumsCollector =
 
             match release with
             | None -> ()
-            | Some release -> return! getReleaseChecksums release repo
+            | Some release -> return! getReleaseChecksums (OctokitRelease release) repo
         }
+
+    let handleCallbackRelease (body: ReleaseCallbackBody.Root) =
+        let repo =
+            { kind = Github
+              user = body.Release.Author.Login
+              repo = body.Repository.Name
+              checksums = [] }
+
+        getReleaseChecksums (CallbackRelease body.Release) repo
