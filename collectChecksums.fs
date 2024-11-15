@@ -13,7 +13,7 @@ let rec readQueue () =
     async {
         // This will wait until the queue can be locked.
         do!
-            Queue.consumeReleases (fun repo ->
+            Queue.consumeRepoReleases (fun repo ->
                 printfn "repo = %A" repo
                 handleRepoRelease repo |> Async.RunSynchronously)
             |> Async.AwaitTask

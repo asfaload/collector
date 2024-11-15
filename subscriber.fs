@@ -197,7 +197,10 @@ let rec subscriptionLoop (page: IPage) =
                     let! isSubsbscribed = subscribeTo page r.user r.repo
 
                     if isSubsbscribed then
-                        let! _r = Asfaload.Collector.Queue.triggerReleaseDownload r.user r.repo |> Async.AwaitTask
+                        let! _r =
+                            Asfaload.Collector.Queue.triggerRepoReleaseDownload r.user r.repo
+                            |> Async.AwaitTask
+
                         ()
 
                     do! Async.Sleep 5000

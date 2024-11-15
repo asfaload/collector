@@ -18,4 +18,4 @@ let repo =
       kind = Github
       checksums = [] }
 
-Queue.publish repo |> Async.AwaitTask |> Async.RunSynchronously
+Queue.publishRepoRelease repo |> Async.AwaitTask |> Async.RunSynchronously

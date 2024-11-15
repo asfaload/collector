@@ -20,7 +20,7 @@ let last_modified_file =
 
 let handleRelease (repo: Repo) =
     printfn "registering release %A://%s/%s" repo.kind repo.user repo.repo
-    Queue.publish repo
+    Queue.publishRepoRelease repo
 
 
 let releasesHandler (json: System.Text.Json.JsonElement) =

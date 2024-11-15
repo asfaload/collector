@@ -24,22 +24,17 @@ module Queue =
             cachedContext <- Some ctx
             ctx
 
-    let getStream () =
+    let getStream (streamName: string) (subjects: string array) =
         task {
 
             match cachedStream with
             | Some s -> return s
             | None ->
                 let js = getContext ()
-                let streamName = "RELEASES"
 
                 let! s =
                     js.CreateStreamAsync(
-                        new StreamConfig(
-                            streamName,
-                            subjects = [| "releases.>" |],
-                            Retention = StreamConfigRetention.Workqueue
-                        )
+                        new StreamConfig(streamName, subjects = subjects, Retention = StreamConfigRetention.Workqueue)
                     )
 
                 cachedStream <- Some s
@@ -47,18 +42,26 @@ module Queue =
 
         }
 
-    let publish (repo: Repo) =
+    let publishToQueue (streamName: string) (subjects: string array) (q: string) (serialised: string) =
         task {
             // Need to initialise stream here
-            let! stream = getStream ()
+            let! stream = getStream streamName subjects
             let js = getContext ()
-            let! ack = js.PublishAsync($"releases.new.{repo.user}/{repo.repo}", repo |> JsonSerializer.Serialize)
+            let! ack = js.PublishAsync(q, serialised)
             ack.EnsureSuccess()
+
         }
 
-    let consumeReleases (f: Repo -> unit) =
+    let publishRepoRelease (repo: Repo) =
+        publishToQueue
+            "RELEASES"
+            [| "releases.>" |]
+            ($"releases.new.{repo.user}/{repo.repo}")
+            (repo |> JsonSerializer.Serialize)
+
+    let consumeRepoReleases (f: Repo -> unit) =
         task {
-            let! stream = getStream ()
+            let! stream = getStream "RELEASES" [| "releases.>" |]
             let! consumer = stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("releases_processor"))
 
             do!
@@ -71,7 +74,7 @@ module Queue =
 
         }
 
-    let triggerReleaseDownload (user: string) (repo: string) =
+    let triggerRepoReleaseDownload (user: string) (repo: string) =
         task {
             let repo =
                 { user = user
@@ -79,5 +82,5 @@ module Queue =
                   kind = Github
                   checksums = [] }
 
-            do! publish repo
+            do! publishRepoRelease repo
         }
