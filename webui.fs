@@ -66,6 +66,13 @@ let validateJwt (ctx: HttpContext) =
         // if token is invalid, authoriseActionCall will return None
         // which will stop the pipeline
         |> Option.bind authoriseActionCall
+        // Log outcome
+        |> Option.map (fun r ->
+            printfn "jwt was valid"
+            r)
+        |> Option.orElseWith (fun () ->
+            printfn "jwt was INVALID"
+            None)
         // If the call was Successful, we return the wrapped context to
         // continue the pipeline
         |> Option.map (fun _ -> ctx)
