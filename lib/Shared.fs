@@ -107,3 +107,10 @@ module ChecksumHelpers =
             else
                 return NoRelease
         }
+
+    let filterChecksums (s: seq<string>) =
+        s
+        |> Seq.filter (fun assetName ->
+            CHECKSUMS
+            |> List.exists (fun chk -> Regex.IsMatch(assetName, chk, RegexOptions.IgnoreCase)))
+        |> Seq.toList

@@ -255,21 +255,12 @@ module ChecksumsCollector =
 
     let updateChecksumsNames (rel: Release) (repo: Repo) =
         async {
-            let releaseId = rel.Id
 
             if (isNull (Environment.GetEnvironmentVariable("DEBUG"))) then
                 do! Async.Sleep 60_000
 
-            // FIXME: check duplication with Shared
             let checksumsFiles =
-                rel.Assets
-                |> Seq.map (fun a -> a.Name)
-                |> Seq.filter (fun assetName ->
-                    CHECKSUMS
-                    |> List.exists (fun chk ->
-                        let regex = Regex(chk)
-                        Regex.IsMatch(assetName, chk, RegexOptions.IgnoreCase)))
-                |> Seq.toList
+                rel.Assets |> Seq.map (fun a -> a.Name) |> ChecksumHelpers.filterChecksums
 
             printfn "found checksums files %A" checksumsFiles
             return { repo with checksums = checksumsFiles }
@@ -299,14 +290,10 @@ module ChecksumsCollector =
             | Net.HttpStatusCode.OK ->
                 let json = response |> Response.toJson
 
-                // FIXME: this is all duplicated from Shared.fs
                 let checksumsFiles =
                     json.AsArray()
-                    |> Array.filter (fun a ->
-                        CHECKSUMS
-                        |> List.exists (fun chk -> Regex.IsMatch(a?name.ToString(), chk, RegexOptions.IgnoreCase)))
-                    |> Array.map (fun a -> a?name.AsString())
-                    |> Array.toList
+                    |> Array.map (fun e -> e?name.ToString())
+                    |> ChecksumHelpers.filterChecksums
 
                 printfn "found checksums files %A" checksumsFiles
                 return { repo with checksums = checksumsFiles }
