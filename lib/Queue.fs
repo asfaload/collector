@@ -63,7 +63,11 @@ module Queue =
             (repo |> JsonSerializer.Serialize)
 
     let publishCallbackRelease user repo (callbackBody: string) =
-        publishToQueue "RELEASES_CALLBACK" [| "releases_callback.>" |] ($"releases.new.{user}/{repo}") callbackBody
+        publishToQueue
+            "RELEASES_CALLBACK"
+            [| "releases_callback.>" |]
+            ($"releases_callback.new.{user}/{repo}")
+            callbackBody
 
     let consumeRepoReleases (f: Repo -> unit) =
         task {
