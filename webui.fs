@@ -60,6 +60,9 @@ let validateJwt (ctx: HttpContext) =
     async.Return(
 
         ctx.request.header "Authorization"
+        |> (function
+        | Choice1Of2 h -> Some h
+        | Choice2Of2 _e -> None)
         // if token is invalid, authoriseActionCall will return None
         // which will stop the pipeline
         |> Option.bind authoriseActionCall
