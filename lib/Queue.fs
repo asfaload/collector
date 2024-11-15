@@ -13,7 +13,9 @@ module Queue =
 
 
     let mutable cachedContext: INatsJSContext option = None
-    let mutable cachedStream: INatsJSStream option = None
+    //let mutable cachedStream: INatsJSStream option = None
+    //let mutable cachedContext: Map<string, INatsJSContext> = Map.empty
+    let mutable cachedStream: Map<string, INatsJSStream> = Map.empty
 
     let getContext () =
         match cachedContext with
@@ -28,7 +30,7 @@ module Queue =
     let getStream (streamName: string) (subjects: string array) =
         task {
 
-            match cachedStream with
+            match cachedStream.TryFind streamName with
             | Some s -> return s
             | None ->
                 let js = getContext ()
@@ -38,7 +40,7 @@ module Queue =
                         new StreamConfig(streamName, subjects = subjects, Retention = StreamConfigRetention.Workqueue)
                     )
 
-                cachedStream <- Some s
+                cachedStream <- cachedStream.Add(streamName, s)
                 return s
 
         }
