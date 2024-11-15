@@ -77,8 +77,15 @@ module Queue =
             do!
                 consumer.FetchAsync<string>(opts = new NatsJSFetchOpts(MaxMsgs = 1))
                 |> TaskSeq.iter (fun jmsg ->
-                    f (jmsg.Data |> JsonSerializer.Deserialize<Repo>)
-                    jmsg.AckAsync().AsTask() |> Async.AwaitTask |> Async.RunSynchronously)
+                    try
+                        f (jmsg.Data |> JsonSerializer.Deserialize<Repo>)
+                        jmsg.AckAsync().AsTask() |> Async.AwaitTask |> Async.RunSynchronously
+                    with e ->
+                        printfn "got error: %s" e.StackTrace
+                        printfn "will still dispense of message %s" jmsg.Data
+                        jmsg.AckAsync().AsTask() |> Async.AwaitTask |> Async.RunSynchronously
+
+                )
 
             printfn "after fetch async"
 
