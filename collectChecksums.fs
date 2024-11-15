@@ -15,7 +15,9 @@ let rec readQueue () =
         do!
             Queue.consumeCallbackRelease (fun callbackBody ->
                 printfn "running callbackRelease %s" (callbackBody.Repository.FullName)
-                handleCallbackRelease callbackBody |> Async.RunSynchronously)
+            // FIXME: enable callback release handling
+            // handleCallbackRelease callbackBody |> Async.RunSynchronously
+            )
             |> Async.AwaitTask
 
         do! Async.Sleep 5000
