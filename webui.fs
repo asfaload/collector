@@ -56,7 +56,12 @@ let authoriseActionCall (jwt: string) : (Asfaload.Collector.JwtPayload.Root opti
     | None -> output |> Output.toText |> Asfaload.Collector.JwtPayload.Parse |> Some
 
 
-let validateJwt (ctx: HttpContext) =
+let parseReleaseActionBody (request: HttpRequest) =
+    request.rawForm
+    |> System.Text.Encoding.ASCII.GetString
+    |> Asfaload.Collector.ReleaseCallbackBody.Parse
+
+let validateJwtAndBody (ctx: HttpContext) =
     async.Return(
 
         ctx.request.header "Authorization"
@@ -73,6 +78,16 @@ let validateJwt (ctx: HttpContext) =
         |> Option.orElseWith (fun () ->
             printfn "jwt was INVALID"
             None)
+        // Check Repo in body corresponds to repo in jwt
+        |> Option.bind (fun payload ->
+            let body = parseReleaseActionBody ctx.request
+
+            if payload.Repository = body.Repository.FullName then
+                printfn "repository in body validated with jwt"
+                Some payload
+            else
+                printfn "repository in body different from jwt!!"
+                None)
         // If the call was Successful, we return the wrapped context to
         // continue the pipeline
         |> Option.map (fun _ -> ctx)
@@ -110,14 +125,10 @@ let app: WebPart =
               | _ -> Suave.RequestErrors.FORBIDDEN "Provide authentication code")
           POST
           >=> path "/v1/github_action_register_release"
-          >=> validateJwt
+          >=> validateJwtAndBody
           >=> request (fun req ->
 
-              let body =
-                  req.rawForm
-                  |> System.Text.Encoding.ASCII.GetString
-                  |> Asfaload.Collector.ReleaseCallbackBody.Parse
-
+              let body = parseReleaseActionBody req
               let user = body.Repository.Owner.Login
               let repo = body.Repository.Name
 
