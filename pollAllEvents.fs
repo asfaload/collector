@@ -134,4 +134,13 @@ let main () =
         return 0
     }
 
-main () |> Async.RunSynchronously |> exit
+let rec loop () =
+    try
+        let _exitStatus = main () |> Async.RunSynchronously
+        ()
+    with e ->
+        printfn "%s:\n%s" e.Message e.StackTrace
+
+    loop ()
+
+loop ()
