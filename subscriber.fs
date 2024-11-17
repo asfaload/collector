@@ -40,6 +40,7 @@ let subscribeTo (page: IPage) (username: string) (repo: string) =
             do!
                 page
                     .GetByRole(AriaRole.Button, PageGetByRoleOptions(Name = "Watch"))
+                    .Filter(LocatorFilterOptions(Has = page.Locator("span", PageLocatorOptions(HasText = "Watch"))))
                     .ClickAsync()
                 |> Async.AwaitTask
 
