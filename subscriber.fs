@@ -188,7 +188,7 @@ let isLoggedIn (page: IPage) =
 
 let rec subscriptionLoop (page: IPage) =
     async {
-        let! unsubscribedRepos = Repos.getUnsubscribedRepos () |> Repos.run
+        let! unsubscribedRepos = Repos.getUnsubscribedRepos () |> Sqlite.run
 
         let! _r =
             unsubscribedRepos
@@ -211,7 +211,7 @@ let rec subscriptionLoop (page: IPage) =
 
         let! _r =
             unsubscribedRepos
-            |> List.map (fun r -> Repos.setSubscribed r |> Repos.run)
+            |> List.map (fun r -> Repos.setSubscribed r |> Sqlite.run)
             |> Async.Sequential
 
         printfn "%A Sleeping before next subscription loop" DateTime.Now

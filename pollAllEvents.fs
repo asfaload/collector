@@ -98,12 +98,12 @@ let eventHandler (el: System.Text.Json.JsonElement) =
                 // We skip repos named neovim as we encountered a ton of forks
                 // with no relevant data
                 let user, gitRepo = fullRepoName.Split("/") |> (fun a -> a[0], a[1])
-                let! count = Repos.isKnown user gitRepo |> Repos.run
+                let! count = Repos.isKnown user gitRepo |> Sqlite.run
                 let seen = count <> 0
 
                 if not seen && not (fullRepoName.EndsWith("/neovim")) then
                     printfn "**NEW**"
-                    do! Repos.seen user gitRepo |> Repos.run
+                    do! Repos.seen user gitRepo |> Sqlite.run
 
                     match! getReleasesForRepo fullRepoName with
                     | NoRelease -> printfn "No release found"
