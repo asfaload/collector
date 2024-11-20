@@ -133,27 +133,30 @@ let app: WebPart =
           >=> (fun (ctx: HttpContext) ->
               async {
 
+                  let call = "github_action_register_release"
                   let req = ctx.request
                   let body = parseReleaseActionBody req
                   let user = body.Repository.Owner.Login
                   let repo = body.Repository.Name
 
                   let! userProfile = User.getProfile user
-                  let! requestAccepted = Rates.checkRate userProfile
+                  let! requestAccepted = Rates.checkRate userProfile call
 
                   if requestAccepted then
                       printfn "accepted"
-                  //do!
-                  //    Asfaload.Collector.Queue.publishCallbackRelease
-                  //        user
-                  //        repo
-                  //        (req.rawForm |> System.Text.Encoding.ASCII.GetString)
-                  //    |> Async.AwaitTask
+                      do! Rates.recordRequest "github" user repo call
+                      //do!
+                      //    Asfaload.Collector.Queue.publishCallbackRelease
+                      //        user
+                      //        repo
+                      //        (req.rawForm |> System.Text.Encoding.ASCII.GetString)
+                      //    |> Async.AwaitTask
+                      return Some ctx
                   else
                       printfn "Request to github_action_register_release rejected for user %s/%s" user repo
+                      return None
 
 
-                  return Some ctx
               })
           >=> OK "Ok"
           // Post with curl:

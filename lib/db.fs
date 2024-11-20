@@ -48,7 +48,7 @@ module Repos =
         // last_release causes trouble with DbFun.....
         }
 
-    // create table request_logs(id INTEGER PRIMARY KEY, hoster text, user text, repo text,time text);
+    // create table request_logs(id INTEGER PRIMARY KEY, hoster text, user text, repo text,time text DEFAULT CURRENT_TIMESTAMP, request text);
     type RequestLog =
         { id: int
           hoster: RepoKind
@@ -142,11 +142,11 @@ module Rates =
     let monthlyRequests hoster user repo =
         periodRequests LastMonth hoster user repo
 
-    let individualRateQuery (user: string) (filter: string) (limit: int) =
-        $"select count(*)<{limit} as ok From request_logs where datetime(time)>=datetime('now','{filter}') and user=@user"
+    let individualRateQuery (filter: string) (limit: int) =
+        $"select count(*)<{limit} as ok From request_logs where datetime(time)>=datetime('now','{filter}') and user=@user and request=@request"
 
 
-    let checkRate (p: UserProfile) =
+    let checkRate (p: UserProfile) (request: string) =
         async {
             let limits = p.profile.limits ()
 
@@ -155,19 +155,28 @@ module Rates =
             // Each query will return one of the rate is respected, and we sum them and check all where ok (i.e. 1) giving a total of 3
             let sql =
                 $"""select sum(ok) as ok from (
-              {individualRateQuery p.user (DateModifier.LastDay.ToString()) (limits.releases.day |> Option.defaultValue 1000)}
-              UNION ALL
-              {individualRateQuery p.user (DateModifier.LastWeek.ToString()) (limits.releases.week |> Option.defaultValue 1000)}
-              UNION ALL
-              {individualRateQuery p.user (DateModifier.LastMonth.ToString()) (limits.releases.month |> Option.defaultValue 1000)}
-              )
+                  {individualRateQuery (DateModifier.LastDay.ToString()) (limits.releases.day |> Option.defaultValue 1000)}
+                  UNION ALL
+                  {individualRateQuery (DateModifier.LastWeek.ToString()) (limits.releases.week |> Option.defaultValue 1000)}
+                  UNION ALL
+                  {individualRateQuery (DateModifier.LastMonth.ToString()) (limits.releases.month |> Option.defaultValue 1000)}
+                  )
               """
 
-            printfn "query=\n%s" sql
-
             let! result =
-                query.Sql (sql, Params.String("user"), Results.Single<int64>()) (p.user)
+                query.Sql
+                    (sql, Params.Tuple<string, string>("user", "request"), Results.Single<int64>())
+                    (p.user, request)
                 |> Sqlite.run
 
             return result = 3
         }
+
+    let recordRequest hoster user repo request =
+        let sql =
+            "insert into request_logs(hoster,user, repo, request) VALUES (@hoster, @user, @repo, @request)"
+
+        query.Sql
+            (sql, Params.Tuple<string, string, string, string>("hoster", "user", "repo", "request"), Results.Unit)
+            (hoster, user, repo, request)
+        |> Sqlite.run
