@@ -11,11 +11,6 @@ open Asfaload.Collector
 open GithubNotifications
 open FsHttp
 
-let handleRelease (repo: Repo) =
-    printfn "registering release %A://%s/%s" repo.kind repo.user repo.repo
-    Queue.publishRepoRelease repo
-
-
 let releasesHandler (json: System.Text.Json.JsonElement) =
     task {
 
@@ -32,7 +27,8 @@ let releasesHandler (json: System.Text.Json.JsonElement) =
                   kind = Github
                   checksums = [] }
 
-            do! handleRelease repo
+            printfn "registering release %A://%s/%s" repo.kind repo.user repo.repo
+            do! Queue.publishRepoRelease repo
     }
 
 loop releasesHandler
