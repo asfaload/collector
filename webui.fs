@@ -151,15 +151,14 @@ let app: WebPart =
                       //        repo
                       //        (req.rawForm |> System.Text.Encoding.ASCII.GetString)
                       //    |> Async.AwaitTask
-                      return Some ctx
+                      return! OK "Ok" ctx
                   else
                       do! Rates.recordRejectedRequest "github" user repo call
                       printfn "Request to github_action_register_release rejected for user %s/%s" user repo
-                      return None
+                      return! RequestErrors.TOO_MANY_REQUESTS "Over limit" ctx
 
 
               })
-          >=> OK "Ok"
           // Post with curl:
           // curl -X POST -d '{"user":"asfaload","repo":"asfald"}' https://collector.asfaload.com/v1/register_github_release
           POST
