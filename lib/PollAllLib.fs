@@ -80,7 +80,13 @@ let rec getEventsNumber (number: int) (eventHandler: System.Text.Json.JsonElemen
             return Unchecked.defaultof<_>
     }
 
-let getEvents handler = getEventsNumber 50 handler
+let eventsPerPoll =
+    System.Environment.GetEnvironmentVariable("EVENTS_PER_POLL")
+    |> Option.ofObj
+    |> Option.map int
+    |> Option.defaultValue 30
+
+let getEvents handler = getEventsNumber eventsPerPoll handler
 
 let main handler =
     async {

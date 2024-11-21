@@ -46,5 +46,10 @@ let githubEventHandler (targetNumber: int) (el: System.Text.Json.JsonElement) =
         printfn "Saw %d new repos, having seen %d known repos" countNewRepos countKnownRepos
     }
 
+let newReposPerPoll =
+    System.Environment.GetEnvironmentVariable("NEW_REPOS_PER_POLL")
+    |> Option.ofObj
+    |> Option.map int
+    |> Option.defaultValue 20
 
-loop (githubEventHandler 30)
+loop (githubEventHandler newReposPerPoll)
