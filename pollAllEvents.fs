@@ -88,31 +88,40 @@ let rec getEventsNumber (number: int) (eventHandler: System.Text.Json.JsonElemen
 let getEvents handler = getEventsNumber 50 handler
 
 
-let eventHandler (el: System.Text.Json.JsonElement) =
+let githubEventHandler (targetNumber: int) (el: System.Text.Json.JsonElement) =
     async {
         if el.ValueKind = JsonValueKind.Array then
+            // number of new repos seen
+            let mutable countNewRepos = 0
+            let mutable countKnownRepos = 0
             //let releases = { for event in el.EnumerateArray() when event?``type``="Release"}
             for event in el.EnumerateArray() do
-                let fullRepoName = (event?repo?name).ToString()
-                printf "looking at %s: " fullRepoName
-                // We skip repos named neovim as we encountered a ton of forks
-                // with no relevant data
-                let user, gitRepo = fullRepoName.Split("/") |> (fun a -> a[0], a[1])
-                let! count = Repos.isKnown user gitRepo |> Sqlite.run
-                let seen = count <> 0
 
-                if not seen && not (fullRepoName.EndsWith("/neovim")) then
-                    printfn "**NEW**"
-                    do! Repos.seen user gitRepo |> Sqlite.run
+                if countNewRepos < targetNumber then
+                    let fullRepoName = (event?repo?name).ToString()
+                    printf "looking at %s: " fullRepoName
+                    // We skip repos named neovim as we encountered a ton of forks
+                    // with no relevant data
+                    let user, gitRepo = fullRepoName.Split("/") |> (fun a -> a[0], a[1])
+                    let! count = Repos.isKnown user gitRepo |> Sqlite.run
+                    let seen = count <> 0
 
-                    match! getReleasesForRepo fullRepoName with
-                    | NoRelease -> printfn "No release found"
-                    | NoChecksum -> printfn "Release found, but no checksum file was found"
-                    | Added -> printfn "Added, repo is now tracked"
-                    | Known -> printfn "Repo was already known"
-                else
-                    printfn "-known-"
-                    ()
+                    if not seen && not (fullRepoName.EndsWith("/neovim")) then
+                        printfn "**NEW**"
+                        countNewRepos <- countNewRepos + 1
+                        do! Repos.seen user gitRepo |> Sqlite.run
+
+                        match! getReleasesForRepo fullRepoName with
+                        | NoRelease -> printfn "No release found"
+                        | NoChecksum -> printfn "Release found, but no checksum file was found"
+                        | Added -> printfn "Added, repo is now tracked"
+                        | Known -> printfn "Repo was already known"
+                    else
+                        printfn "-known-"
+                        countKnownRepos <- countKnownRepos + 1
+                        ()
+
+            printfn "Saw %d new repos, having seen %d known repos" countNewRepos countKnownRepos
     }
 
 let main () =
@@ -130,7 +139,7 @@ let main () =
         let queue = Environment.GetEnvironmentVariable("RELEASES_QUEUE")
         // Sleep at restart preventing too rapid requests in case of container restart loop
         do! Async.Sleep 60000
-        let! _ = getEvents eventHandler
+        let! _ = getEvents (githubEventHandler 30)
         return 0
     }
 
