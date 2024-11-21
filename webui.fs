@@ -146,12 +146,14 @@ let app: WebPart =
                             if requestAccepted then
                                 printfn "accepted"
                                 do! Rates.recordAcceptedRequest "github" user repo call
-                                //do!
-                                //    Asfaload.Collector.Queue.publishCallbackRelease
-                                //        user
-                                //        repo
-                                //        (req.rawForm |> System.Text.Encoding.ASCII.GetString)
-                                //    |> Async.AwaitTask
+
+                                do!
+                                    Asfaload.Collector.Queue.publishCallbackRelease
+                                        user
+                                        repo
+                                        (req.rawForm |> System.Text.Encoding.ASCII.GetString)
+                                    |> Async.AwaitTask
+
                                 return! OK "Ok" ctx
                             else
                                 do! Rates.recordRejectedRequest "github" user repo call
@@ -233,6 +235,7 @@ let cfg =
         bindings = [ HttpBinding.createSimple HTTP "0.0.0.0" 8080 ]
         listenTimeout = System.TimeSpan.FromMilliseconds 3000. }
 
+startWebServer cfg app
 startWebServer cfg app
 startWebServer cfg app
 startWebServer cfg app
