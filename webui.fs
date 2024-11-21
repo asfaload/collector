@@ -7,6 +7,7 @@ open Asfaload.Collector.DB
 open Asfaload.Collector.ChecksumHelpers
 open System.Runtime.Serialization
 open Fli
+open Asfaload.Collector.DB
 
 [<DataContract>]
 type RepoToRegister =
@@ -73,7 +74,7 @@ let validateJwtAndBody (ctx: HttpContext) =
         |> Option.bind authoriseActionCall
         // Log outcome
         |> Option.map (fun r ->
-            printfn "jwt was valid"
+            printfn "jwt was valid, request if from %s" (r.Repository)
             r)
         |> Option.orElseWith (fun () ->
             printfn "jwt was INVALID"
@@ -94,6 +95,9 @@ let validateJwtAndBody (ctx: HttpContext) =
     )
 
 
+open Asfaload.Collector.Limits
+open Asfaload.Collector.User
+
 let app: WebPart =
     choose
         [ GET >=> path "/" >=> OK form
@@ -108,7 +112,7 @@ let app: WebPart =
                       |> Option.map (fun r -> r.Split("/") |> (fun a -> (a[0], a[1])))
                       |> Option.map (fun (user, repo) ->
                           try
-                              let created = Repos.create user repo |> Repos.run |> Async.RunSynchronously
+                              let created = Repos.create user repo |> Sqlite.run |> Async.RunSynchronously
 
                               Asfaload.Collector.Queue.triggerRepoReleaseDownload user repo
                               |> Async.AwaitTask
@@ -125,23 +129,40 @@ let app: WebPart =
               | _ -> Suave.RequestErrors.FORBIDDEN "Provide authentication code")
           POST
           >=> path "/v1/github_action_register_release"
-          >=> validateJwtAndBody
-          >=> request (fun req ->
+          >=> choose
+                  [ validateJwtAndBody
+                    >=> (fun (ctx: HttpContext) ->
+                        async {
 
-              let body = parseReleaseActionBody req
-              let user = body.Repository.Owner.Login
-              let repo = body.Repository.Name
+                            let call = "github_action_register_release"
+                            let req = ctx.request
+                            let body = parseReleaseActionBody req
+                            let user = body.Repository.Owner.Login
+                            let repo = body.Repository.Name
 
-              Asfaload.Collector.Queue.publishCallbackRelease
-                  user
-                  repo
-                  (req.rawForm |> System.Text.Encoding.ASCII.GetString)
-              |> Async.AwaitTask
-              |> Async.RunSynchronously
+                            let! userProfile = User.getProfile user
+                            let! requestAccepted = Rates.checkRate userProfile call
 
-              Successful.OK "Ok"
+                            if requestAccepted then
+                                printfn "accepted"
+                                do! Rates.recordAcceptedRequest "github" user repo call
 
-          )
+                                do!
+                                    Asfaload.Collector.Queue.publishCallbackRelease
+                                        user
+                                        repo
+                                        (req.rawForm |> System.Text.Encoding.ASCII.GetString)
+                                    |> Async.AwaitTask
+
+                                return! OK "Ok" ctx
+                            else
+                                do! Rates.recordRejectedRequest "github" user repo call
+                                printfn "Request to github_action_register_release rejected for user %s/%s" user repo
+                                return! RequestErrors.TOO_MANY_REQUESTS "Over limit" ctx
+
+
+                        })
+                    RequestErrors.UNAUTHORIZED "Invalid Jwt" ]
           // Post with curl:
           // curl -X POST -d '{"user":"asfaload","repo":"asfald"}' https://collector.asfaload.com/v1/register_github_release
           POST
@@ -161,7 +182,7 @@ let app: WebPart =
                   // - limit number of releases a project can do
                   let work =
                       async {
-                          let! created = Repos.create repo.user repo.repo |> Repos.run
+                          let! created = Repos.create repo.user repo.repo |> Sqlite.run
                           do! Asfaload.Collector.Queue.triggerRepoReleaseDownload repo.user repo.repo
                           return created
                       }
@@ -214,6 +235,7 @@ let cfg =
         bindings = [ HttpBinding.createSimple HTTP "0.0.0.0" 8080 ]
         listenTimeout = System.TimeSpan.FromMilliseconds 3000. }
 
+startWebServer cfg app
 startWebServer cfg app
 startWebServer cfg app
 startWebServer cfg app
