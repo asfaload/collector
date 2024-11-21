@@ -129,36 +129,38 @@ let app: WebPart =
               | _ -> Suave.RequestErrors.FORBIDDEN "Provide authentication code")
           POST
           >=> path "/v1/github_action_register_release"
-          >=> validateJwtAndBody
-          >=> (fun (ctx: HttpContext) ->
-              async {
+          >=> choose
+                  [ validateJwtAndBody
+                    >=> (fun (ctx: HttpContext) ->
+                        async {
 
-                  let call = "github_action_register_release"
-                  let req = ctx.request
-                  let body = parseReleaseActionBody req
-                  let user = body.Repository.Owner.Login
-                  let repo = body.Repository.Name
+                            let call = "github_action_register_release"
+                            let req = ctx.request
+                            let body = parseReleaseActionBody req
+                            let user = body.Repository.Owner.Login
+                            let repo = body.Repository.Name
 
-                  let! userProfile = User.getProfile user
-                  let! requestAccepted = Rates.checkRate userProfile call
+                            let! userProfile = User.getProfile user
+                            let! requestAccepted = Rates.checkRate userProfile call
 
-                  if requestAccepted then
-                      printfn "accepted"
-                      do! Rates.recordAcceptedRequest "github" user repo call
-                      //do!
-                      //    Asfaload.Collector.Queue.publishCallbackRelease
-                      //        user
-                      //        repo
-                      //        (req.rawForm |> System.Text.Encoding.ASCII.GetString)
-                      //    |> Async.AwaitTask
-                      return! OK "Ok" ctx
-                  else
-                      do! Rates.recordRejectedRequest "github" user repo call
-                      printfn "Request to github_action_register_release rejected for user %s/%s" user repo
-                      return! RequestErrors.TOO_MANY_REQUESTS "Over limit" ctx
+                            if requestAccepted then
+                                printfn "accepted"
+                                do! Rates.recordAcceptedRequest "github" user repo call
+                                //do!
+                                //    Asfaload.Collector.Queue.publishCallbackRelease
+                                //        user
+                                //        repo
+                                //        (req.rawForm |> System.Text.Encoding.ASCII.GetString)
+                                //    |> Async.AwaitTask
+                                return! OK "Ok" ctx
+                            else
+                                do! Rates.recordRejectedRequest "github" user repo call
+                                printfn "Request to github_action_register_release rejected for user %s/%s" user repo
+                                return! RequestErrors.TOO_MANY_REQUESTS "Over limit" ctx
 
 
-              })
+                        })
+                    RequestErrors.UNAUTHORIZED "Invalid Jwt" ]
           // Post with curl:
           // curl -X POST -d '{"user":"asfaload","repo":"asfald"}' https://collector.asfaload.com/v1/register_github_release
           POST
