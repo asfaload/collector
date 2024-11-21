@@ -10,6 +10,7 @@
     <Compile Include="lib/db.fs" />
     <Compile Include="lib/Shared.fs" />
     <Compile Include="lib/Queue.fs" />
+    <Compile Include="lib/GithubNotifications.fs" />
     <Compile Include="checkGithubNotifications.fs" />
   </ItemGroup>
 
