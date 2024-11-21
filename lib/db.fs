@@ -48,7 +48,7 @@ module Repos =
         // last_release causes trouble with DbFun.....
         }
 
-    // create table request_logs(id INTEGER PRIMARY KEY, hoster text, user text, repo text,time text DEFAULT CURRENT_TIMESTAMP, request text);
+    // create table request_logs(id INTEGER PRIMARY KEY, hoster text, user text, repo text,time text DEFAULT CURRENT_TIMESTAMP, request text, over_limit bool);
     type RequestLog =
         { id: int
           hoster: RepoKind
@@ -172,11 +172,30 @@ module Rates =
             return result = 3
         }
 
-    let recordRequest hoster user repo request =
+    let recordRequest (overLimit: bool) hoster user repo request =
         let sql =
-            "insert into request_logs(hoster,user, repo, request) VALUES (@hoster, @user, @repo, @request)"
+            "insert into request_logs(hoster,user, repo, request, over_limit) VALUES (@hoster, @user, @repo, @request,@overLimit)"
 
+        // The commented lines, working with a tuple, caused an error `insufficient parameters supplied to the command`.
         query.Sql
-            (sql, Params.Tuple<string, string, string, string>("hoster", "user", "repo", "request"), Results.Unit)
-            (hoster, user, repo, request)
+            (sql,
+             // Params.Tuple<string, string, string, string, bool>("hoster", "user", "repo", "request", "overLimit"),
+             Params.Record<
+                 {| hoster: string
+                    user: string
+                    repo: string
+                    request: string
+                    overLimit: bool |}
+              >(),
+
+             Results.Unit)
+            //(hoster, user, repo, request, overLimit)
+            {| hoster = hoster
+               user = user
+               repo = repo
+               request = request
+               overLimit = overLimit |}
         |> Sqlite.run
+
+    let recordAcceptedRequest = recordRequest false
+    let recordRejectedRequest = recordRequest true

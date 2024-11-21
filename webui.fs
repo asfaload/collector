@@ -144,7 +144,7 @@ let app: WebPart =
 
                   if requestAccepted then
                       printfn "accepted"
-                      do! Rates.recordRequest "github" user repo call
+                      do! Rates.recordAcceptedRequest "github" user repo call
                       //do!
                       //    Asfaload.Collector.Queue.publishCallbackRelease
                       //        user
@@ -153,6 +153,7 @@ let app: WebPart =
                       //    |> Async.AwaitTask
                       return Some ctx
                   else
+                      do! Rates.recordRejectedRequest "github" user repo call
                       printfn "Request to github_action_register_release rejected for user %s/%s" user repo
                       return None
 
