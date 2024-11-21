@@ -9,6 +9,7 @@
     <Compile Include="lib/Limits.fs" />
     <Compile Include="lib/db.fs" />
     <Compile Include="lib/Shared.fs" />
+    <Compile Include="lib/PollAllLib.fs" />
     <Compile Include="pollAllEvents.fs" />
   </ItemGroup>
 
