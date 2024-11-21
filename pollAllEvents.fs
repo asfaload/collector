@@ -25,14 +25,14 @@ let reposWithoutChecksumsFile =
 
 let mutable reposSeen = List<string>.Empty
 
-let rec getEvents (eventHandler: System.Text.Json.JsonElement -> Async<unit>) =
+let rec getEventsNumber (number: int) (eventHandler: System.Text.Json.JsonElement -> Async<unit>) =
     async {
 
         printfn "Start call at %A" DateTime.Now
 
         let! response =
             http {
-                GET "https://api.github.com/events"
+                GET $"https://api.github.com/events?per_page={number}"
                 Accept "application/vnd.github+json"
                 UserAgent "asfaload-collector"
                 AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
@@ -69,7 +69,7 @@ let rec getEvents (eventHandler: System.Text.Json.JsonElement -> Async<unit>) =
             printfn "Not modified"
             printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
             do! sleeper |> Async.AwaitTask
-            return! getEvents eventHandler
+            return! getEventsNumber number eventHandler
         else if response.statusCode = Net.HttpStatusCode.OK then
 
 
@@ -79,13 +79,13 @@ let rec getEvents (eventHandler: System.Text.Json.JsonElement -> Async<unit>) =
             // Now wait until poll interval is passed
             printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
             do! sleeper |> Async.AwaitTask
-            return! getEvents eventHandler
+            return! getEventsNumber number eventHandler
         else
             failwithf "Unexpected response status code %A" (response.statusCode)
             return Unchecked.defaultof<_>
     }
 
-
+let getEvents handler = getEventsNumber 50 handler
 
 
 let eventHandler (el: System.Text.Json.JsonElement) =
