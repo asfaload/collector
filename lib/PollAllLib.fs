@@ -66,7 +66,11 @@ let rec getEventsNumber (number: int) (eventHandler: System.Text.Json.JsonElemen
 
             let s = response |> Response.toText
             let json = System.Text.Json.JsonDocument.Parse(s)
-            do! eventHandler json.RootElement
+
+            if json.RootElement.ValueKind = JsonValueKind.Array then
+                do! eventHandler json.RootElement
+            else
+                printfn "Json element was not an array!"
             // Now wait until poll interval is passed
             printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
             do! sleeper |> Async.AwaitTask
