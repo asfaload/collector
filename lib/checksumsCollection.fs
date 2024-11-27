@@ -363,10 +363,34 @@ module ChecksumsCollector =
         }
 
     let handleCallbackRelease (body: ReleaseCallbackBody.Root) =
+        let user, hasReleaseInBody =
+            try
+                // try to get user from release in body
+                let user = body.Release.Author.Login
+                user, true
+            with _e ->
+                // Here we got no release in the body, eg due to a release-please triggered call
+                body.Repository.Owner.Login, false
+
         let repo =
             { kind = Github
-              user = body.Release.Author.Login
+              user = user
               repo = body.Repository.Name
               checksums = [] }
 
-        getReleaseChecksums (CallbackRelease body.Release) repo
+        if hasReleaseInBody then
+            getReleaseChecksums (CallbackRelease body.Release) repo
+        else
+            // FIXME: this is not foolproof in case of 2 rapid subsequent releases. We will miss the penultimate one if the second
+            // release is done before we run this.
+            printfn "NOTICE: release callback doesn't have release in body. Will retrieve last release from github."
+
+            async {
+                let! releaseOption = getLastGithubRelease repo
+
+                match releaseOption with
+                | Some release -> return! getReleaseChecksums (OctokitRelease release) repo
+                | None ->
+                    printfn "ERROR: !!! No last release found although got release callback"
+                    return ()
+            }
