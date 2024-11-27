@@ -12,13 +12,13 @@ open Asfaload.Collector
 let rec readQueue () =
     async {
 
-        do!
-            Queue.consumeCallbackRelease (fun callbackBody ->
-                printfn "running callbackRelease %s" (callbackBody.Repository.FullName)
-                handleCallbackRelease callbackBody |> Async.RunSynchronously)
-            |> Async.AwaitTask
+        //do!
+        //    Queue.consumeCallbackRelease (fun callbackBody ->
+        //        printfn "running callbackRelease %s" (callbackBody.Repository.FullName)
+        //        handleCallbackRelease callbackBody |> Async.RunSynchronously)
+        //    |> Async.AwaitTask
 
-        do! Async.Sleep 5000
+        //do! Async.Sleep 5000
 
         do!
             Queue.consumeRepoReleases (fun repo ->
