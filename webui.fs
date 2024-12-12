@@ -38,6 +38,19 @@ user/repo: <input type="text" name="repo" placeholder="user/repo"></input><br/>
 </body>
 """
 
+let suggestForm =
+    """
+<html>
+<head>
+</head>
+<body>
+<form method="post" action="/register_suggestion">
+user/repo: <input type="text" name="repo" placeholder="user/repo"></input><br/>
+<button>Submit</button>
+</form>
+
+</body>
+"""
 
 
 let jwt_validate = System.Environment.GetEnvironmentVariable("JWT_VALIDATOR_PATH")
@@ -101,6 +114,17 @@ open Asfaload.Collector.User
 let app: WebPart =
     choose
         [ GET >=> path "/" >=> OK form
+          GET >=> path "/suggest" >=> OK suggestForm
+          POST
+          >=> path "/register_suggestion"
+          >=> request (fun req ->
+              match req["repo"] with
+              | Some repo ->
+                  printfn "SUGGESTION: %s" repo
+                  Successful.OK $"""Thanks for the suggestion, it will be handled shortly!<br/>{suggestForm}"""
+              | None -> Suave.RequestErrors.BAD_REQUEST "Please provide the github repo to add to the Asfaload mirror")
+
+
           POST
           >=> path "/notify_github_release"
           >=> request (fun req ->
