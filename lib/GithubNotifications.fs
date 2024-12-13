@@ -9,6 +9,29 @@ open System.Text.Json
 let last_modified_file =
     Environment.GetEnvironmentVariable("NOTIFICATIONS_LAST_MODIFIED_FILE")
 
+let markNotificationsReadUntil (lastModified: DateTimeOffset) =
+    printfn "will mark notifications as read"
+
+    async {
+        let! response =
+            http {
+                GET "https://api.github.com/notifications"
+                Accept "application/vnd.github+json"
+                UserAgent "rbauduin-test"
+                AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
+                header "X-GitHub-Api-Version" "2022-11-28"
+                body
+
+                jsonSerialize
+                    {| last_read_at = lastModified
+                       read = true |}
+            }
+            |> Request.sendAsync
+
+        printfn "Mark as read response code %A %A" response.statusCode (response.ToText())
+
+    }
+
 let rec getNotifications
     (lastModified: DateTimeOffset option)
     (releasesHandler: System.Text.Json.JsonElement -> System.Threading.Tasks.Task<unit>)
@@ -84,6 +107,7 @@ let rec getNotifications
 
                         )
 
+
                         Some v
                     // This should not happen as the reponse is supposed to have the last-modified
                     // header. However, just in case, we handle the situation of a response without it.
@@ -102,6 +126,10 @@ let rec getNotifications
             let json = System.Text.Json.JsonDocument.Parse(s)
             do! releasesHandler json.RootElement |> Async.AwaitTask
             // Now wait until poll interval is passed
+            match lastModified with
+            | Some dt -> do! markNotificationsReadUntil dt
+            | None -> ()
+
             printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
             do! sleeper |> Async.AwaitTask
             return! getNotifications lastModified releasesHandler
