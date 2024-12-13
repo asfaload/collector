@@ -9,15 +9,18 @@ open System.Text.Json
 let last_modified_file =
     Environment.GetEnvironmentVariable("NOTIFICATIONS_LAST_MODIFIED_FILE")
 
+let notifications_since_file =
+    Environment.GetEnvironmentVariable("NOTIFICATIONS_SINCE_FILE")
+
 let markNotificationsReadUntil (lastModified: DateTimeOffset) =
-    printfn "will mark notifications as read"
+    printfn "will mark notifications as read from %A" lastModified
 
     async {
         let! response =
             http {
-                GET "https://api.github.com/notifications"
+                PUT "https://api.github.com/notifications"
                 Accept "application/vnd.github+json"
-                UserAgent "rbauduin-test"
+                UserAgent "frshstff-test"
                 AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
                 header "X-GitHub-Api-Version" "2022-11-28"
                 body
@@ -26,25 +29,39 @@ let markNotificationsReadUntil (lastModified: DateTimeOffset) =
                     {| last_read_at = lastModified
                        read = true |}
             }
+            |> (fun r ->
+                printfn "%s" (r.ToString())
+                r)
             |> Request.sendAsync
 
-        printfn "Mark as read response code %A %A" response.statusCode (response.ToText())
+        printfn "Mark as read response code %A" response.statusCode
+        File.WriteAllText("/tmp/last_mark_as_read_response.json", response.ToText())
 
     }
 
 let rec getNotifications
     (lastModified: DateTimeOffset option)
-    (releasesHandler: System.Text.Json.JsonElement -> System.Threading.Tasks.Task<unit>)
+    (releasesHandler: Rest.Notification.NotificationData.Root -> System.Threading.Tasks.Task<unit>)
     =
     async {
 
         printfn "Start call at %A" DateTime.Now
 
+        let sinceParam =
+            if File.Exists notifications_since_file then
+                let since = File.ReadAllText notifications_since_file
+                printfn "retrieving unread notifications since %s" since
+                Some $"since={since}"
+            else
+                printfn "no 'since' filter passed"
+                None
+
+
         let! response =
             http {
-                GET "https://api.github.com/notifications"
+                GET $"""https://api.github.com/notifications?{sinceParam |> Option.defaultValue ""}"""
                 Accept "application/vnd.github+json"
-                UserAgent "rbauduin-test"
+                UserAgent "frshstff-test"
                 AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
                 header "X-GitHub-Api-Version" "2022-11-28"
                 //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
@@ -52,10 +69,15 @@ let rec getNotifications
                     "If-Modified-Since"
 
                     (lastModified
+                     // If we have a since, do not include the modified header
+                     |> Option.bind (fun offset -> if sinceParam.IsNone then Some offset else None)
                      |> Option.map (fun offset -> offset.DateTime |> HttpRequestHeaders.IfModifiedSince)
                      |> Option.map (fun (_h, v) -> v)
                      |> Option.defaultValue (DateTime.Parse("2020-01-01") |> HttpRequestHeaders.IfModifiedSince |> snd))
             }
+            |> (fun r ->
+                printfn "%s" (r.ToString())
+                r)
             |> Request.sendAsync
 
         printfn "response code %A" response.statusCode
@@ -124,15 +146,66 @@ let rec getNotifications
             printfn "Last-modified = %A" lastModified
             let s = response |> Response.toText
             let json = System.Text.Json.JsonDocument.Parse(s)
-            do! releasesHandler json.RootElement |> Async.AwaitTask
+
+            // We keep track of the most recent notification we read. This is useful when we miss a bunch of
+            // notifications. When we then retrieve notifications, we will not get all notifications, and if we used the
+            // last modified value (set as header by the server, and corresponding to the time of the query), we would miss a lot of notifications
+            let mutable mostRecentNotification: Option<DateTimeOffset> = None
+
+            for notif in (json.RootElement.EnumerateArray()) do
+
+                let notificationData =
+                    (notif.ToString()) |> Rest.Notification.NotificationData.Parse
+
+                match mostRecentNotification with
+                | Some dt ->
+                    let notificationUpdatedAt = notificationData.UpdatedAt
+
+                    // as notifications are returned most recent first, we need to keep track
+                    // of the oldest notification we handle here
+                    if notificationUpdatedAt < dt then
+                        mostRecentNotification <- Some notificationUpdatedAt
+                | None -> mostRecentNotification <- Some notificationData.UpdatedAt
+
+                do! releasesHandler notificationData |> Async.AwaitTask
             // Now wait until poll interval is passed
-            match lastModified with
-            | Some dt -> do! markNotificationsReadUntil dt
-            | None -> ()
+            let! effectiveLastModified =
+                match lastModified, mostRecentNotification with
+                | Some dt, None ->
+                    async {
+                        printfn "user last modified"
+                        do! markNotificationsReadUntil dt
+                        return Some dt
+                    }
+                | None, Some dt ->
+                    async {
+                        printfn "user notification update time"
+                        do! markNotificationsReadUntil dt
+                        return Some dt
+                    }
+                // When we have both, we keep the earliest as the point from which we need to query notifications
+                // at the next iteration
+                | Some modified, Some read ->
+                    async {
+                        if read < modified then
+                            printfn "using notification update time %A and not modified %A" read modified
+                            do! markNotificationsReadUntil read
+                            return Some read
+                        else
+                            printfn "using modified %A and not notification update time %A" modified read
+                            do! markNotificationsReadUntil modified
+                            return Some modified
+                    }
+                | None, None ->
+                    async {
+                        printfn "no last-modified, so not marking read to that point"
+                        return None
+                    }
 
             printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
             do! sleeper |> Async.AwaitTask
-            return! getNotifications lastModified releasesHandler
+            printfn "User last -modified value of %A" effectiveLastModified
+            return! getNotifications effectiveLastModified releasesHandler
         else
             failwithf "Unexpected response status code %A" (response.statusCode)
             return Unchecked.defaultof<_>
@@ -162,4 +235,7 @@ let rec loop handler =
     with e ->
         printfn "%s:\n%s" e.Message e.StackTrace
 
+    loop handler
+    loop handler
+    loop handler
     loop handler
