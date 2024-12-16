@@ -44,6 +44,34 @@ let markNotificationsReadUntil (lastModified: DateTimeOffset) (read: bool) =
 
     }
 
+let getLastModifiedFromResponseOrFile (response: Response) =
+    response.content.Headers.LastModified
+    |> (fun n -> if n.HasValue then (Some n.Value) else None)
+    |> function
+        | Some v ->
+            // Register last modified time we saw
+            v
+            |> JsonSerializer.Serialize
+            |> (fun json ->
+                printfn $"registering most recent last-modified to {last_modified_file}"
+
+                try
+                    File.WriteAllText(last_modified_file, json)
+                with e ->
+                    printfn "got exception message %s, not registering last modified on disk" e.Message)
+
+            Some v
+        // This should not happen as the reponse is supposed to have the last-modified
+        // header. However, just in case, we handle the situation of a response without it.
+        | None ->
+            // If the file exists, it contains the last-modified value for the
+            // most recent notification we handled.
+            if File.Exists(last_modified_file) then
+                printfn "Using last modified from file when request didn't send any"
+                Some(File.ReadAllText last_modified_file |> JsonSerializer.Deserialize)
+            else
+                None
+
 let rec getNotifications
     (lastModified: DateTimeOffset option)
     (releasesHandler: Rest.Notification.NotificationData.Root -> System.Threading.Tasks.Task<unit>)
@@ -116,36 +144,7 @@ let rec getNotifications
             do! sleeper |> Async.AwaitTask
             return! getNotifications lastModified releasesHandler
         else if response.statusCode = Net.HttpStatusCode.OK then
-            let lastModified =
-                response.content.Headers.LastModified
-                |> (fun n -> if n.HasValue then (Some n.Value) else None)
-                |> function
-                    | Some v ->
-                        // Register last modified time we saw
-                        v
-                        |> JsonSerializer.Serialize
-                        |> (fun json ->
-                            printfn $"registering most recent last-modified to {last_modified_file}"
-
-                            try
-                                File.WriteAllText(last_modified_file, json)
-                            with e ->
-                                printfn "got exception message %s, not registering last modified on disk" e.Message
-
-                        )
-
-
-                        Some v
-                    // This should not happen as the reponse is supposed to have the last-modified
-                    // header. However, just in case, we handle the situation of a response without it.
-                    | None ->
-                        // If the file exists, it contains the last-modified value for the
-                        // most recent notification we handled.
-                        if File.Exists(last_modified_file) then
-                            printfn "Using last modified from file when request didn't send any"
-                            Some(File.ReadAllText last_modified_file |> JsonSerializer.Deserialize)
-                        else
-                            None
+            let lastModified = getLastModifiedFromResponseOrFile response
 
 
             printfn "Last-modified = %A" lastModified
@@ -172,6 +171,8 @@ let rec getNotifications
                 do! releasesHandler notificationData |> Async.AwaitTask
 
             do! markNotificationsReadUntil (mostRecentNotification |> Option.get) true
+            do! Async.Sleep 2000
+            do! markNotificationsReadUntil (oldestNotification |> Option.get) false
             // Now wait until poll interval is passed
             let! effectiveLastModified =
                 match lastModified, mostRecentNotification with
@@ -235,4 +236,5 @@ let rec loop handler =
     with e ->
         printfn "%s:\n%s" e.Message e.StackTrace
 
+    loop handler
     loop handler
