@@ -44,6 +44,35 @@ let markNotificationsReadUntil (lastModified: DateTimeOffset) (read: bool) =
 
     }
 
+let getPollSleeper (response: Response) =
+    let headers = response.headers
+
+    let pollInterval =
+        try
+            headers.GetValues("X-Poll-Interval") |> Seq.tryHead
+        with _e ->
+            Some "60"
+
+    printfn "pollInterval = %A" pollInterval
+
+    let nextPollAt =
+        pollInterval
+        |> Option.map (fun interval -> DateTime.Now + TimeSpan.FromSeconds(float interval))
+
+
+    printfn "Next poll at %A" nextPollAt
+    // An async sleeper we will wait after we do our work
+    let sleeper =
+        Async.Sleep(
+            pollInterval
+            |> Option.map int
+            |> Option.map ((*) 1000)
+            |> Option.defaultValue 60000
+        )
+        |> Async.StartAsTask
+
+    sleeper
+
 let getLastModifiedFromResponseOrFile (response: Response) =
     response.content.Headers.LastModified
     |> (fun n -> if n.HasValue then (Some n.Value) else None)
@@ -114,33 +143,12 @@ let rec getNotifications
             |> Request.sendAsync
 
         printfn "response code %A" response.statusCode
-        let headers = response.headers
+        let sleeper = getPollSleeper response
 
-        let pollInterval =
-            try
-                headers.GetValues("X-Poll-Interval") |> Seq.tryHead
-            with _e ->
-                Some "60"
-
-        printfn "pollInterval = %A" pollInterval
-
-        let nextPollAt =
-            pollInterval
-            |> Option.map (fun interval -> DateTime.Now + TimeSpan.FromSeconds(float interval))
-
-        // An async sleeper we will wait after we do our work
-        let sleeper =
-            Async.Sleep(
-                pollInterval
-                |> Option.map int
-                |> Option.map ((*) 1000)
-                |> Option.defaultValue 60000
-            )
-            |> Async.StartAsTask
 
         if response.statusCode = Net.HttpStatusCode.NotModified then
             printfn "Not modified"
-            printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
+            printfn "%A Waiting until next" (DateTime.Now)
             do! sleeper |> Async.AwaitTask
             return! getNotifications lastModified releasesHandler
         else if response.statusCode = Net.HttpStatusCode.OK then
@@ -203,7 +211,7 @@ let rec getNotifications
                         return None
                     }
 
-            printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
+            printfn "%A Waiting until next poll" (DateTime.Now)
             do! sleeper |> Async.AwaitTask
             printfn "User last -modified value of %A" effectiveLastModified
             return! getNotifications effectiveLastModified releasesHandler
@@ -236,5 +244,6 @@ let rec loop handler =
     with e ->
         printfn "%s:\n%s" e.Message e.StackTrace
 
+    loop handler
     loop handler
     loop handler
