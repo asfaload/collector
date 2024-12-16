@@ -259,7 +259,7 @@ main () |> Async.AwaitTask |> Async.RunSynchronously |> exit
 //    PUT $"https://api.github.com/repos/{user}/{repo}/subscription"
 //    AcceptLanguage "en-US"
 //    Accept "application/vnd.github+json"
-//    UserAgent "rbauduin-test"
+//    UserAgent FromEnv.GH_USER_AGENT
 //    AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
 //    header "X-GitHub-Api-Version" "2022-11-28"
 //    body

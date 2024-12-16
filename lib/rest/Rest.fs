@@ -23,7 +23,7 @@ module Release =
                 http {
                     GET $"https://api.github.com/repos/{user}/{repo}/releases/latest"
                     Accept "application/vnd.github+json"
-                    UserAgent(Environment.GetEnvironmentVariable("GH_USER_AGENT"))
+                    UserAgent FromEnv.GH_USER_AGENT
                     AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
                     header "X-GitHub-Api-Version" "2022-11-28"
                 //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"

@@ -25,7 +25,7 @@ let rec getEventsNumber (number: int) (eventHandler: System.Text.Json.JsonElemen
             http {
                 GET $"https://api.github.com/events?per_page={number}"
                 Accept "application/vnd.github+json"
-                UserAgent "asfaload-collector"
+                UserAgent FromEnv.GH_USER_AGENT
                 AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
                 header "X-GitHub-Api-Version" "2022-11-28"
             }

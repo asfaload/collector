@@ -27,7 +27,7 @@ let markNotificationsReadUntil (lastModified: DateTimeOffset) (read: bool) =
             http {
                 PUT "https://api.github.com/notifications"
                 Accept "application/vnd.github+json"
-                UserAgent "frshstff-test"
+                UserAgent FromEnv.GH_USER_AGENT
                 AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
                 header "X-GitHub-Api-Version" "2022-11-28"
                 body
@@ -115,7 +115,7 @@ let collectNotificationsFromServer (lastModified: DateTimeOffset option) (url: S
                 http {
                     GET(url.ToString())
                     Accept "application/vnd.github+json"
-                    UserAgent "frshstff-test"
+                    UserAgent FromEnv.GH_USER_AGENT
                     AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
                     header "X-GitHub-Api-Version" "2022-11-28"
                     //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
