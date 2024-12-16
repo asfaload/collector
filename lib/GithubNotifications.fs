@@ -12,7 +12,12 @@ let last_modified_file =
 let notifications_since_file =
     Environment.GetEnvironmentVariable("NOTIFICATIONS_SINCE_FILE")
 
-let markNotificationsReadUntil (lastModified: DateTimeOffset) =
+// This is not so useful as notifications are returned most recent first, and
+// here we mark all notif older than X as read.
+// Something to try:
+// 1. Mark all notifications read until the most recent handled
+// 2. Mark all notifications unread until the oldest handled
+let markNotificationsReadUntil (lastModified: DateTimeOffset) (read: bool) =
     printfn "will mark notifications as read from %A" lastModified
 
     async {
@@ -27,7 +32,7 @@ let markNotificationsReadUntil (lastModified: DateTimeOffset) =
 
                 jsonSerialize
                     {| last_read_at = lastModified
-                       read = true |}
+                       read = read |}
             }
             |> (fun r ->
                 printfn "%s" (r.ToString())
@@ -165,19 +170,19 @@ let rec getNotifications
                 oldestNotification <- Some notificationData.UpdatedAt
 
                 do! releasesHandler notificationData |> Async.AwaitTask
+
+            do! markNotificationsReadUntil (mostRecentNotification |> Option.get) true
             // Now wait until poll interval is passed
             let! effectiveLastModified =
                 match lastModified, mostRecentNotification with
                 | Some dt, None ->
                     async {
                         printfn "user last modified"
-                        do! markNotificationsReadUntil dt
                         return Some dt
                     }
                 | None, Some dt ->
                     async {
                         printfn "user notification update time"
-                        do! markNotificationsReadUntil dt
                         return Some dt
                     }
                 // When we have both, we keep the earliest as the point from which we need to query notifications
@@ -186,11 +191,9 @@ let rec getNotifications
                     async {
                         if read < modified then
                             printfn "using notification update time %A and not modified %A" read modified
-                            do! markNotificationsReadUntil read
                             return Some read
                         else
                             printfn "using modified %A and not notification update time %A" modified read
-                            do! markNotificationsReadUntil modified
                             return Some modified
                     }
                 | None, None ->
