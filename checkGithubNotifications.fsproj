@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="lib/rest/Rest.fs" />
     <Compile Include="lib/Limits.fs" />
     <Compile Include="lib/db.fs" />
     <Compile Include="lib/Shared.fs" />

@@ -9,26 +9,19 @@
 
 open Asfaload.Collector
 open GithubNotifications
-open FsHttp
+open Rest
 
-let releasesHandler (json: System.Text.Json.JsonElement) =
+let releasesHandler (notificationData: Notification.NotificationData.Root) =
     task {
 
-        // Access and lock queue
-        // As we `use` is, it gets disposed when becoming out of scope.
-        // We cannot keep it open, because it would prevent other processes to access it.
-        for release in (json.EnumerateArray()) do
-            let user = (release?repository?owner?login.ToString())
-            let repo = (release?repository?name.ToString())
+        let repo =
+            { user = notificationData.Repository.Owner.Login
+              repo = notificationData.Repository.Name
+              kind = Github
+              checksums = [] }
 
-            let repo =
-                { user = user
-                  repo = repo
-                  kind = Github
-                  checksums = [] }
-
-            printfn "registering release %A://%s/%s" repo.kind repo.user repo.repo
-            do! Queue.publishRepoRelease repo
+        printfn "registering release %A://%s/%s" repo.kind repo.user repo.repo
+        do! Queue.publishRepoRelease repo
     }
 
 loop releasesHandler
