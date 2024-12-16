@@ -157,15 +157,9 @@ let rec getNotifications
                 let notificationData =
                     (notif.ToString()) |> Rest.Notification.NotificationData.Parse
 
-                match mostRecentNotification with
-                | Some dt ->
-                    let notificationUpdatedAt = notificationData.UpdatedAt
-
-                    // as notifications are returned most recent first, we need to keep track
-                    // of the oldest notification we handle here
-                    if notificationUpdatedAt < dt then
-                        mostRecentNotification <- Some notificationUpdatedAt
-                | None -> mostRecentNotification <- Some notificationData.UpdatedAt
+                // The newest is the first one we get
+                if mostRecentNotification.IsNone then
+                    mostRecentNotification <- Some notificationData.UpdatedAt
 
                 do! releasesHandler notificationData |> Async.AwaitTask
             // Now wait until poll interval is passed
