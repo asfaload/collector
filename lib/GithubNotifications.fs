@@ -5,6 +5,8 @@ open System.IO
 open FsHttp
 open FSharp.Data
 open System.Text.Json
+open FSharp.Control
+open System.Threading.Tasks
 
 let last_modified_file =
     Environment.GetEnvironmentVariable("NOTIFICATIONS_LAST_MODIFIED_FILE")
@@ -101,6 +103,93 @@ let getLastModifiedFromResponseOrFile (response: Response) =
             else
                 None
 
+let collectNotificationsFromServer (lastModified: DateTimeOffset option) (url: System.Uri) =
+    let rec loop (sleeper: Ref<Task<unit> option>) (lastModified: DateTimeOffset option) (url: System.Uri) =
+        asyncSeq {
+
+            printfn "will request url %s" (url.ToString())
+            let queryParameters = url.Query |> System.Web.HttpUtility.ParseQueryString
+            let sinceParam = queryParameters["since"] |> Option.ofObj
+
+            let! response =
+                http {
+                    GET(url.ToString())
+                    Accept "application/vnd.github+json"
+                    UserAgent "frshstff-test"
+                    AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
+                    header "X-GitHub-Api-Version" "2022-11-28"
+                    //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
+                    header
+                        "If-Modified-Since"
+
+                        (lastModified
+                         // If we have a since, do not include the modified header
+                         |> Option.bind (fun offset -> if sinceParam.IsNone then Some offset else None)
+                         |> Option.map (fun offset -> offset.DateTime |> HttpRequestHeaders.IfModifiedSince)
+                         |> Option.map (fun (_h, v) -> v)
+                         |> Option.defaultValue (
+                             DateTime.Parse("2020-01-01") |> HttpRequestHeaders.IfModifiedSince |> snd
+                         ))
+                }
+                |> Request.sendAsync
+
+            match sleeper.Value with
+            | Some _ -> ()
+            | None -> sleeper.Value <- Some(getPollSleeper response)
+
+
+            if response.statusCode = Net.HttpStatusCode.NotModified then
+                printfn "Not modified"
+                printfn "%A Waiting until next" (DateTime.Now)
+                ()
+            else
+                let s = response |> Response.toText
+                let json = System.Text.Json.JsonDocument.Parse(s)
+
+                for notif in (json.RootElement.EnumerateArray()) do
+
+                    let notificationData =
+                        (notif.ToString()) |> Rest.Notification.NotificationData.Parse
+
+                    yield notificationData
+
+            let headers = response.headers
+
+            try
+                // The link header has this format:
+                // link: <https://api.github.com/notifications?per_page=50&page=2>; rel="next", <https://api.github.com/notifications?per_page=50&page=28>; rel="last"
+                let linkHeader = headers.GetValues("link") |> Seq.head
+                printfn "found a link header, will look for next page: %s" linkHeader
+
+                let nextUrl =
+                    linkHeader.Split(",")
+                    // Split different urls
+                    |> Array.map (fun l -> l.Split(";") |> (fun a -> a[0].Trim(), a[1].Trim()))
+                    // Only keep next
+                    |> Array.filter (fun (_p1, p2) -> p2.Trim() = "rel=\"next\"")
+                    // Remove text decoration
+                    |> Array.map (fun (p1, _) -> p1.Replace("<", "").Replace(">", ""))
+                    |> Array.tryHead
+                    |> Option.map System.Uri
+
+                match nextUrl with
+                | Some uri ->
+                    printfn "found next page url, will use it"
+                    do! Async.Sleep 1000
+                    yield! loop sleeper lastModified uri
+                | None -> printfn "no next page, end here"
+            with e ->
+                printfn "caught exception %s" e.Message
+                ()
+
+        }
+
+    async {
+        let sleeper = ref None
+        let s = loop sleeper lastModified url
+        return sleeper.Value, s
+    }
+
 let rec getNotifications
     (lastModified: DateTimeOffset option)
     (releasesHandler: Rest.Notification.NotificationData.Root -> System.Threading.Tasks.Task<unit>)
@@ -119,105 +208,14 @@ let rec getNotifications
                 None
 
 
-        let! response =
-            http {
-                GET $"""https://api.github.com/notifications?{sinceParam |> Option.defaultValue ""}"""
-                Accept "application/vnd.github+json"
-                UserAgent "frshstff-test"
-                AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
-                header "X-GitHub-Api-Version" "2022-11-28"
-                //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
-                header
-                    "If-Modified-Since"
+        let url =
+            $"""https://api.github.com/notifications?{sinceParam |> Option.defaultValue ""}"""
+            |> System.Uri
 
-                    (lastModified
-                     // If we have a since, do not include the modified header
-                     |> Option.bind (fun offset -> if sinceParam.IsNone then Some offset else None)
-                     |> Option.map (fun offset -> offset.DateTime |> HttpRequestHeaders.IfModifiedSince)
-                     |> Option.map (fun (_h, v) -> v)
-                     |> Option.defaultValue (DateTime.Parse("2020-01-01") |> HttpRequestHeaders.IfModifiedSince |> snd))
-            }
-            |> (fun r ->
-                printfn "%s" (r.ToString())
-                r)
-            |> Request.sendAsync
-
-        printfn "response code %A" response.statusCode
-        let sleeper = getPollSleeper response
-
-
-        if response.statusCode = Net.HttpStatusCode.NotModified then
-            printfn "Not modified"
-            printfn "%A Waiting until next" (DateTime.Now)
-            do! sleeper |> Async.AwaitTask
-            return! getNotifications lastModified releasesHandler
-        else if response.statusCode = Net.HttpStatusCode.OK then
-            let lastModified = getLastModifiedFromResponseOrFile response
-
-
-            printfn "Last-modified = %A" lastModified
-            let s = response |> Response.toText
-            let json = System.Text.Json.JsonDocument.Parse(s)
-
-            // We keep track of the most recent notification we read. This is useful when we miss a bunch of
-            // notifications. When we then retrieve notifications, we will not get all notifications, and if we used the
-            // last modified value (set as header by the server, and corresponding to the time of the query), we would miss a lot of notifications
-            let mutable mostRecentNotification: Option<DateTimeOffset> = None
-            let mutable oldestNotification: Option<DateTimeOffset> = None
-
-            for notif in (json.RootElement.EnumerateArray()) do
-
-                let notificationData =
-                    (notif.ToString()) |> Rest.Notification.NotificationData.Parse
-
-                // The newest is the first one we get
-                if mostRecentNotification.IsNone then
-                    mostRecentNotification <- Some notificationData.UpdatedAt
-                // The oldest is the last we will handle
-                oldestNotification <- Some notificationData.UpdatedAt
-
-                do! releasesHandler notificationData |> Async.AwaitTask
-
-            do! markNotificationsReadUntil (mostRecentNotification |> Option.get) true
-            do! Async.Sleep 2000
-            do! markNotificationsReadUntil (oldestNotification |> Option.get) false
-            // Now wait until poll interval is passed
-            let! effectiveLastModified =
-                match lastModified, mostRecentNotification with
-                | Some dt, None ->
-                    async {
-                        printfn "user last modified"
-                        return Some dt
-                    }
-                | None, Some dt ->
-                    async {
-                        printfn "user notification update time"
-                        return Some dt
-                    }
-                // When we have both, we keep the earliest as the point from which we need to query notifications
-                // at the next iteration
-                | Some modified, Some read ->
-                    async {
-                        if read < modified then
-                            printfn "using notification update time %A and not modified %A" read modified
-                            return Some read
-                        else
-                            printfn "using modified %A and not notification update time %A" modified read
-                            return Some modified
-                    }
-                | None, None ->
-                    async {
-                        printfn "no last-modified, so not marking read to that point"
-                        return None
-                    }
-
-            printfn "%A Waiting until next poll" (DateTime.Now)
-            do! sleeper |> Async.AwaitTask
-            printfn "User last -modified value of %A" effectiveLastModified
-            return! getNotifications effectiveLastModified releasesHandler
-        else
-            failwithf "Unexpected response status code %A" (response.statusCode)
-            return Unchecked.defaultof<_>
+        let! sleeper, asyncsequence = collectNotificationsFromServer lastModified url
+        do! asyncsequence |> AsyncSeq.iterAsync (releasesHandler >> Async.AwaitTask)
+        do! sleeper |> Option.defaultValue (task { return () }) |> Async.AwaitTask
+        ()
     }
 
 
