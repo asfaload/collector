@@ -151,6 +151,7 @@ let rec getNotifications
             // notifications. When we then retrieve notifications, we will not get all notifications, and if we used the
             // last modified value (set as header by the server, and corresponding to the time of the query), we would miss a lot of notifications
             let mutable mostRecentNotification: Option<DateTimeOffset> = None
+            let mutable oldestNotification: Option<DateTimeOffset> = None
 
             for notif in (json.RootElement.EnumerateArray()) do
 
@@ -160,6 +161,8 @@ let rec getNotifications
                 // The newest is the first one we get
                 if mostRecentNotification.IsNone then
                     mostRecentNotification <- Some notificationData.UpdatedAt
+                // The oldest is the last we will handle
+                oldestNotification <- Some notificationData.UpdatedAt
 
                 do! releasesHandler notificationData |> Async.AwaitTask
             // Now wait until poll interval is passed
