@@ -236,6 +236,3 @@ let rec loop handler =
         printfn "%s:\n%s" e.Message e.StackTrace
 
     loop handler
-    loop handler
-    loop handler
-    loop handler
