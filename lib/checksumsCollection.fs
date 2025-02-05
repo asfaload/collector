@@ -281,7 +281,7 @@ module ChecksumsCollector =
                 http {
                     GET $"https://api.github.com/repos/{user}/{repo}/releases/{releaseId}/assets"
                     Accept "application/vnd.github+json"
-                    UserAgent "asfaload-collector"
+                    UserAgent FromEnv.GH_USER_AGENT
                     //AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
                     header "X-GitHub-Api-Version" "2022-11-28"
                 //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
