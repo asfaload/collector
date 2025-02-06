@@ -9,7 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="UnitTest1.fs" />
+    <ProjectReference Include="../../checkGithubNotifications.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="GithubNotifications.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
