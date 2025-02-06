@@ -9,6 +9,12 @@ open System.Text.Json
 let last_modified_file =
     Environment.GetEnvironmentVariable("NOTIFICATIONS_LAST_MODIFIED_FILE")
 
+let getPollInterval (headers: System.Net.Http.Headers.HttpResponseHeaders) =
+    try
+        headers.GetValues("X-Poll-Interval") |> Seq.tryHead
+    with _e ->
+        Some "60"
+
 let markNotificationsReadUntil (lastModified: DateTimeOffset) =
     printfn "will mark notifications as read"
 
@@ -61,11 +67,7 @@ let rec getNotifications
         printfn "response code %A" response.statusCode
         let headers = response.headers
 
-        let pollInterval =
-            try
-                headers.GetValues("X-Poll-Interval") |> Seq.tryHead
-            with _e ->
-                Some "60"
+        let pollInterval = getPollInterval headers
 
         printfn "pollInterval = %A" pollInterval
 
