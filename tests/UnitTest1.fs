@@ -1,6 +1,7 @@
 module tests
 
 open NUnit.Framework
+open FsUnit
 
 [<SetUp>]
 let Setup () =
@@ -8,4 +9,4 @@ let Setup () =
 
 [<Test>]
 let Test1 () =
-    Assert.Pass()
+    true |> should equal true
