@@ -15,8 +15,19 @@ open NUnit.Framework
 open NUnit
 open FsUnit
 
+open System.Diagnostics
+
 [<SetUp>]
 let Setup () = ()
+
+[<OneTimeSetUp>]
+let OneTimeSetup () =
+    System.Diagnostics.Trace.Listeners.Add(new System.Diagnostics.ConsoleTraceListener())
+    |> ignore
+
+[<OneTimeTearDown>]
+let OneTimeTearDown () = System.Diagnostics.Trace.Flush()
+
 
 [<Test>]
 let test_GetPollInterval () =
