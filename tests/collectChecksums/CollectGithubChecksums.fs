@@ -10,6 +10,12 @@ open NUnit.Framework
 open NUnit
 open FsUnit
 
+open Suave
+open Suave.Operators
+open Suave.Filters
+open Suave.Writers
+open Suave.Successful
+
 open System.IO
 
 [<SetUp>]
@@ -46,3 +52,35 @@ let test_createReleaseDir () =
     let r = createReleaseDir "/bin" "to/be/deleted"
     r |> should equal None
     Directory.Exists expectedDir |> should equal false
+
+[<Test>]
+let test_downloadChecksums () =
+
+    use _server =
+        GET
+        >=> choose
+                [ path "/get_checksums" >=> OK "checksums file content"
+                  path "/error" >=> Suave.RequestErrors.NOT_FOUND "File not found" ]
+        |> serve
+
+    let checksumsUri = System.Uri(url "/get_checksums")
+
+    // Download new file
+    let tempDir = Directory.CreateTempSubdirectory().FullName
+    let expectedPath = Path.Combine(tempDir, "get_checksums")
+    File.Exists(expectedPath) |> should equal false
+    let r = downloadChecksums checksumsUri tempDir
+    printfn "tempDir = %s" tempDir
+    r |> should equal (Some expectedPath)
+    File.Exists(expectedPath) |> should equal true
+
+    // Download existing file
+    File.Exists(expectedPath) |> should equal true
+    let r = downloadChecksums checksumsUri tempDir
+    r |> should equal None
+    File.Exists(expectedPath) |> should equal true
+
+    // Download error
+    let errorURI = System.Uri(url "/error")
+    let r = downloadChecksums errorURI tempDir
+    r |> should equal None
