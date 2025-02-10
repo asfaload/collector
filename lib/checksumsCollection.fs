@@ -216,7 +216,7 @@ module ChecksumsCollector =
         }
 
 
-    let downloadReleaseChecksums (release: Release) (r: Repo) =
+    let downloadReleaseChecksums (releaseHtmlUrl: string) (releasePublishedAt: Nullable<DateTimeOffset>) (r: Repo) =
         let toOption (nullable: Nullable<_>) =
             if nullable.HasValue then Some nullable.Value else None
 
@@ -224,7 +224,7 @@ module ChecksumsCollector =
             printfn "Running downloadLast for %s/%s" r.user r.repo
 
 
-            let lastUri = System.Uri(release.HtmlUrl)
+            let lastUri = System.Uri(releaseHtmlUrl)
 
             let downloadSegments =
                 lastUri.Segments |> Array.map (fun s -> if s = "tag/" then "download/" else s)
@@ -249,7 +249,7 @@ module ChecksumsCollector =
 
                         Index.generateChecksumsList
                             downloadDir
-                            (toOption release.PublishedAt)
+                            (toOption releasePublishedAt)
                             (Some DateTimeOffset.UtcNow)
 
                         gitAdd baseDir downloadDir |> ignore
@@ -339,7 +339,9 @@ module ChecksumsCollector =
 
             let! validatedRelease = validateRelease repo release
             let! updatedRepo = updateChecksumsNames validatedRelease repo
-            let! optionsArray = downloadReleaseChecksums validatedRelease updatedRepo
+
+            let! optionsArray =
+                downloadReleaseChecksums validatedRelease.HtmlUrl validatedRelease.PublishedAt updatedRepo
 
             // If we downloaded a new checksums file, we need to commit
             if optionsArray |> Array.exists (fun o -> o.IsSome) then
