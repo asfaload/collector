@@ -67,7 +67,7 @@ module ChecksumsCollector =
         gitMutex.ReleaseMutex()
         ()
 
-    let gitAdd (path: string) =
+    let gitAdd (baseDir: string) (path: string) =
         gitMutex.WaitOne() |> ignore
         printfn "running git add %s" path
 
@@ -157,7 +157,7 @@ module ChecksumsCollector =
                 |> getDownloadDir lastUri.Host
                 |> createReleaseDir baseDir
                 |> Option.bind (downloadChecksums checksumsUri)
-                |> Option.map gitAdd
+                |> Option.map (gitAdd baseDir)
 
 
             match resultingOption with
@@ -247,7 +247,7 @@ module ChecksumsCollector =
                             (toOption release.PublishedAt)
                             (Some DateTimeOffset.UtcNow)
 
-                        gitAdd downloadDir |> ignore
+                        gitAdd baseDir downloadDir |> ignore
                     else
                         printfn "not generating index for inexisting directory %s" downloadDir
 
