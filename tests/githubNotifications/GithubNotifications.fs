@@ -110,3 +110,56 @@ let test_getAndPersistLastModified () =
     getAndPersistLastModifiedFromResponseOrFile response cacheFilePath
     |> dateTimeOffsetOptionToHeader
     |> should equal lastModifiedSetHeader
+
+
+[<Test>]
+let test_getNotificationsFrom () =
+    async {
+        // Our server just returns the first page of the notifications (doesn't handle per page and page number)
+        use _server =
+            GET
+            >=> path "/notifications"
+            >=> request (fun _r ->
+                let json = System.IO.File.ReadAllText("fixtures/8pp_p1.json")
+                OK json)
+            |> serve
+
+        let httpRequest = http { GET(url "/notifications") }
+        // We don't mark notificationas as read i nour tests
+        let markAsRead = fun _ -> async { return () }
+        // FIXME: Add test with lastModified set
+        let lastModified = None
+
+        // We will accumulate the projects we have a notification from in this array
+        let mutable acc = [||]
+
+        // Handler accumulating in the array
+        let releasesHandler (json: System.Text.Json.JsonElement) =
+            task {
+
+                for release in (json.EnumerateArray()) do
+                    let user = (release?repository?owner?login.ToString())
+                    let repo = (release?repository?name.ToString())
+                    acc <- Array.append acc [| sprintf "registering release %s/%s" repo user |]
+
+            }
+
+        // Call function
+        do! getNotificationsFrom false httpRequest markAsRead lastModified releasesHandler
+
+        // Check the accumulator was updated accordingly
+        acc
+        |> should
+            equal
+            [|
+
+               "registering release AutoBuildImmortalWrt/comengdoc"
+               "registering release frontier/aereal"
+               "registering release opg-s3-antivirus/ministryofjustice"
+               "registering release OpenWrt_x86/mgz0227"
+               "registering release pulumi-harbor/pulumiverse"
+               "registering release thingino-firmware/CazYokoyama"
+               "registering release thingino-firmware/olek87"
+               "registering release mason-registry/mason-org" |]
+
+    }
