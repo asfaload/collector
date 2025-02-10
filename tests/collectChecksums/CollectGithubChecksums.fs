@@ -84,3 +84,15 @@ let test_downloadChecksums () =
     let errorURI = System.Uri(url "/error")
     let r = downloadChecksums errorURI tempDir
     r |> should equal None
+
+
+[<Test>]
+let test_getDownloadDir () =
+    let downloadUrl =
+        "https://github.com/asfaload/asfald/releases/download/v0.5.1/asfald-aarch64-unknown-linux-musl"
+
+    let downloadUri = System.Uri(downloadUrl)
+    let r = getDownloadDir "github.com" (downloadUri.Segments)
+
+    r
+    |> should equal "github.com/asfaload/asfald/releases/download/v0.5.1/asfald-aarch64-unknown-linux-musl"
