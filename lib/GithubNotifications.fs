@@ -73,7 +73,9 @@ let markNotificationsReadUntil (lastModified: DateTimeOffset) =
 
     }
 
-let rec getNotifications
+let rec getNotificationsFrom
+    (httpRequest: IToRequest)
+    (markNotificationsAsRead: DateTimeOffset -> Async<unit>)
     (lastModified: DateTimeOffset option)
     (releasesHandler: System.Text.Json.JsonElement -> System.Threading.Tasks.Task<unit>)
     =
@@ -81,23 +83,7 @@ let rec getNotifications
 
         printfn "Start call at %A" DateTime.Now
 
-        let! response =
-            http {
-                GET "https://api.github.com/notifications"
-                Accept "application/vnd.github+json"
-                UserAgent "rbauduin-test"
-                AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
-                header "X-GitHub-Api-Version" "2022-11-28"
-                //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
-                header
-                    "If-Modified-Since"
-
-                    (lastModified
-                     |> Option.map (fun offset -> offset.DateTime |> HttpRequestHeaders.IfModifiedSince)
-                     |> Option.map (fun (_h, v) -> v)
-                     |> Option.defaultValue (DateTime.Parse("2020-01-01") |> HttpRequestHeaders.IfModifiedSince |> snd))
-            }
-            |> Request.sendAsync
+        let! response = httpRequest |> Request.sendAsync
 
         printfn "response code %A" response.statusCode
         let headers = response.headers
@@ -124,7 +110,7 @@ let rec getNotifications
             printfn "Not modified"
             printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
             do! sleeper |> Async.AwaitTask
-            return! getNotifications lastModified releasesHandler
+            return! getNotificationsFrom httpRequest markNotificationsAsRead lastModified releasesHandler
         else if response.statusCode = Net.HttpStatusCode.OK then
             let lastModified =
                 getAndPersistLastModifiedFromResponseOrFile response last_modified_file
@@ -136,17 +122,41 @@ let rec getNotifications
             do! releasesHandler json.RootElement |> Async.AwaitTask
             // Now wait until poll interval is passed
             match lastModified with
-            | Some dt -> do! markNotificationsReadUntil dt
+            | Some dt -> do! markNotificationsAsRead dt
             | None -> ()
 
             printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
             do! sleeper |> Async.AwaitTask
-            return! getNotifications lastModified releasesHandler
+            return! getNotificationsFrom httpRequest markNotificationsAsRead lastModified releasesHandler
         else
             failwithf "Unexpected response status code %A" (response.statusCode)
             return Unchecked.defaultof<_>
     }
 
+// This is the function called from running code.
+// It passes the right default parameters to another function, which can be more easily tested
+let getNotifications
+    (lastModified: DateTimeOffset option)
+    (releasesHandler: System.Text.Json.JsonElement -> System.Threading.Tasks.Task<unit>)
+    =
+    let httpRequest =
+        http {
+            GET "https://api.github.com/notifications"
+            Accept "application/vnd.github+json"
+            UserAgent "rbauduin-test"
+            AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
+            header "X-GitHub-Api-Version" "2022-11-28"
+            //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
+            header
+                "If-Modified-Since"
+
+                (lastModified
+                 |> Option.map (fun offset -> offset.DateTime |> HttpRequestHeaders.IfModifiedSince)
+                 |> Option.map (fun (_h, v) -> v)
+                 |> Option.defaultValue (DateTime.Parse("2020-01-01") |> HttpRequestHeaders.IfModifiedSince |> snd))
+        }
+
+    getNotificationsFrom httpRequest markNotificationsReadUntil lastModified releasesHandler
 
 let main handler =
     async {
