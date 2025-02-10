@@ -16,7 +16,10 @@ open Suave.Filters
 open Suave.Writers
 open Suave.Successful
 
+open System
 open System.IO
+
+open Fli
 
 [<SetUp>]
 let Setup () = ()
@@ -29,6 +32,40 @@ let OneTimeSetup () =
 [<OneTimeTearDown>]
 let OneTimeTearDown () = System.Diagnostics.Trace.Flush()
 
+// Used to initial a git repo for tests
+let gitInit (dir: string) =
+    cli {
+        Exec "git"
+        Arguments [ "init" ]
+        WorkingDirectory(dir)
+    }
+    |> Command.execute
+    |> Output.throwIfErrored
+    |> ignore
+
+let gitLog (dir: string) =
+    let r =
+        cli {
+            Exec "git"
+            Arguments [ "log"; "--oneline" ]
+            WorkingDirectory(dir)
+        }
+        |> Command.execute
+        |> Output.throwIfErrored
+
+    r.Text
+
+let gitDiffCached (dir: string) =
+    let r =
+        cli {
+            Exec "git"
+            Arguments [ "diff"; "--cached"; "--name-only" ]
+            WorkingDirectory(dir)
+        }
+        |> Command.execute
+        |> Output.throwIfErrored
+
+    r.Text
 
 [<Test>]
 let test_createReleaseDir () =
@@ -96,3 +133,63 @@ let test_getDownloadDir () =
 
     r
     |> should equal "github.com/asfaload/asfald/releases/download/v0.5.1/asfald-aarch64-unknown-linux-musl"
+
+[<Test>]
+let test_downloadIndividualChecksumsFile () =
+    async {
+
+        let releasePath = "asfaload/asfald/releases/download/v0.5.1"
+
+        use _server =
+            GET
+            >=> choose
+                    [ path $"/{releasePath}/checksums.txt" >=> OK "checksums file content"
+                      path $"/{releasePath}/checksums_512.txt"
+                      >=> Suave.RequestErrors.NOT_FOUND "File not found" ]
+            |> serve
+
+        // Create new repo
+        let baseDir = Directory.CreateTempSubdirectory().FullName
+        gitInit baseDir
+
+        // Setup variables
+        let fullUri = Uri($"http://127.0.0.1:8080/{releasePath}")
+        let host = fullUri.Host
+        let segments = fullUri.Segments
+        let fileName = "checksums.txt"
+
+        // Issue call to tested function
+        let! r = downloadIndividualChecksumsFile baseDir fullUri segments fileName
+
+        // Check the file has been downloaded
+        r |> should equal (Some $"{baseDir}/{host}/{releasePath}/checksums.txt")
+
+        // Check it was git added, but not committed
+        gitDiffCached baseDir
+        |> should equal (Some $"{host}/{releasePath}/checksums.txt")
+
+        // Error in download of file
+        // -------------------------
+
+        // Create new repo
+        let baseDir = Directory.CreateTempSubdirectory().FullName
+        gitInit baseDir
+
+        // Setup variables
+        let fullUri = Uri($"http://127.0.0.1:8080/{releasePath}")
+        let host = fullUri.Host
+        let segments = fullUri.Segments
+        let fileName = "checksums_512.txt"
+
+        // Issue call to tested function
+        let! r = downloadIndividualChecksumsFile baseDir fullUri segments fileName
+
+        // Check we don't fail but return None for failed download
+        r |> should equal None
+
+        // Check nothing was added to git
+        gitDiffCached baseDir |> should equal None
+
+        ()
+
+    }

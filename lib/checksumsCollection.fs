@@ -146,7 +146,12 @@ module ChecksumsCollector =
         |> Array.append [| host |]
         |> Path.Combine
 
-    let downloadIndividualChecksumsFile (lastUri: Uri) (downloadSegments: string array) (filename: string) =
+    let downloadIndividualChecksumsFile
+        (baseDir: string)
+        (lastUri: Uri)
+        (downloadSegments: string array)
+        (filename: string)
+        =
         async {
             let checksumsSegments = Array.append downloadSegments [| filename |]
             let checksumsPath = Path.Join(checksumsSegments)
@@ -229,7 +234,7 @@ module ChecksumsCollector =
                 |> List.map (fun name ->
                     async {
                         do! Async.Sleep 1000
-                        return! downloadIndividualChecksumsFile lastUri downloadSegments name
+                        return! downloadIndividualChecksumsFile baseDir lastUri downloadSegments name
                     })
 
             let relativeDownloadDir = getDownloadDir lastUri.Host downloadSegments
