@@ -85,9 +85,9 @@ module ChecksumsCollector =
 
     // Returns Some only if the directory was created.
     // If the directory existed or in case of error, returns None
-    let createReleaseDir (path: string) =
+    let createReleaseDir (baseDir: string) (path: string) =
         printfn "createReleaseDir got path %s" path
-        let baseDir = Environment.GetEnvironmentVariable("BASE_DIR")
+
         printfn "basedir = %s" baseDir
         // Second path needs to be relative, or it iss returned as result.....
         let absoluteDirPath = Path.Combine(baseDir, path)
@@ -152,7 +152,7 @@ module ChecksumsCollector =
             let resultingOption =
                 downloadSegments
                 |> getDownloadDir lastUri.Host
-                |> createReleaseDir
+                |> createReleaseDir baseDir
                 |> Option.bind (downloadChecksums checksumsUri)
                 |> Option.map gitAdd
 
