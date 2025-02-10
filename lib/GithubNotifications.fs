@@ -74,6 +74,7 @@ let markNotificationsReadUntil (lastModified: DateTimeOffset) =
     }
 
 let rec getNotificationsFrom
+    (recurse: bool)
     (httpRequest: IToRequest)
     (markNotificationsAsRead: DateTimeOffset -> Async<unit>)
     (lastModified: DateTimeOffset option)
@@ -108,9 +109,13 @@ let rec getNotificationsFrom
 
         if response.statusCode = Net.HttpStatusCode.NotModified then
             printfn "Not modified"
-            printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
-            do! sleeper |> Async.AwaitTask
-            return! getNotificationsFrom httpRequest markNotificationsAsRead lastModified releasesHandler
+
+            if recurse then
+                printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
+                do! sleeper |> Async.AwaitTask
+                return! getNotificationsFrom recurse httpRequest markNotificationsAsRead lastModified releasesHandler
+            else
+                return Unchecked.defaultof<_>
         else if response.statusCode = Net.HttpStatusCode.OK then
             let lastModified =
                 getAndPersistLastModifiedFromResponseOrFile response last_modified_file
@@ -125,9 +130,13 @@ let rec getNotificationsFrom
             | Some dt -> do! markNotificationsAsRead dt
             | None -> ()
 
-            printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
-            do! sleeper |> Async.AwaitTask
-            return! getNotificationsFrom httpRequest markNotificationsAsRead lastModified releasesHandler
+
+            if recurse then
+                printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
+                do! sleeper |> Async.AwaitTask
+                return! getNotificationsFrom recurse httpRequest markNotificationsAsRead lastModified releasesHandler
+            else
+                return Unchecked.defaultof<_>
         else
             failwithf "Unexpected response status code %A" (response.statusCode)
             return Unchecked.defaultof<_>
@@ -156,7 +165,9 @@ let getNotifications
                  |> Option.defaultValue (DateTime.Parse("2020-01-01") |> HttpRequestHeaders.IfModifiedSince |> snd))
         }
 
-    getNotificationsFrom httpRequest markNotificationsReadUntil lastModified releasesHandler
+    let recurse = true
+
+    getNotificationsFrom recurse httpRequest markNotificationsReadUntil lastModified releasesHandler
 
 let main handler =
     async {
