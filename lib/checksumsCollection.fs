@@ -18,6 +18,7 @@ module ChecksumsCollector =
 
 
     let CHECKSUMS = ChecksumHelpers.CHECKSUMS
+    let baseDir = Environment.GetEnvironmentVariable "BASE_DIR"
 
     let gitMutex = new System.Threading.Mutex()
 
@@ -28,7 +29,7 @@ module ChecksumsCollector =
         cli {
             Exec "git"
             Arguments [ "commit"; "-m"; subject ]
-            WorkingDirectory(Environment.GetEnvironmentVariable "BASE_DIR")
+            WorkingDirectory(baseDir)
         }
         |> Command.execute
         |> Output.throwIfErrored
@@ -45,7 +46,7 @@ module ChecksumsCollector =
             cli {
                 Exec "git"
                 Arguments [ "rev-list"; "--count"; "origin/master..master" ]
-                WorkingDirectory(Environment.GetEnvironmentVariable "BASE_DIR")
+                WorkingDirectory(baseDir)
             }
             |> Command.execute
             |> Output.throwIfErrored
@@ -56,7 +57,7 @@ module ChecksumsCollector =
             cli {
                 Exec "git"
                 Arguments [ "push" ]
-                WorkingDirectory(Environment.GetEnvironmentVariable "BASE_DIR")
+                WorkingDirectory(baseDir)
             }
             |> Command.execute
             |> Output.throwIfErrored
@@ -73,7 +74,7 @@ module ChecksumsCollector =
         cli {
             Exec "git"
             Arguments [ "add"; path ]
-            WorkingDirectory(Environment.GetEnvironmentVariable "BASE_DIR")
+            WorkingDirectory(baseDir)
         }
         |> Command.execute
         |> Output.throwIfErrored
@@ -230,8 +231,7 @@ module ChecksumsCollector =
 
             let relativeDownloadDir = getDownloadDir lastUri.Host downloadSegments
 
-            let downloadDir =
-                Path.Combine(System.Environment.GetEnvironmentVariable("BASE_DIR"), relativeDownloadDir)
+            let downloadDir = Path.Combine(baseDir, relativeDownloadDir)
 
 
             let generateIndexAsync =
