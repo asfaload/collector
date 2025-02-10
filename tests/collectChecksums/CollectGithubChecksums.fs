@@ -4,6 +4,7 @@ open FsHttp
 open FsHttp.Tests.TestHelper
 open FsHttp.Tests.Server
 
+open Asfaload.Collector
 open Asfaload.Collector.ChecksumsCollector
 
 open NUnit.Framework
@@ -192,4 +193,51 @@ let test_downloadIndividualChecksumsFile () =
 
         ()
 
+    }
+
+[<Test>]
+let test_downloadReleaseChecksums () =
+    async {
+
+        let releasePath = "asfaload/asfald/releases/download/v0.5.1"
+
+        use _server =
+            GET
+            >=> choose
+                    [ path $"/{releasePath}/checksums.txt"
+                      >=> OK(File.ReadAllText "fixtures/checksums.txt")
+                      path $"/{releasePath}/checksums_512.txt"
+                      >=> OK(File.ReadAllText "fixtures/checksums.txt")
+                      path $"/{releasePath}/checksums_1024.txt"
+                      >=> Suave.RequestErrors.NOT_FOUND "File not found" ]
+            |> serve
+
+        // Create new repo
+        let baseDir = Directory.CreateTempSubdirectory().FullName
+        gitInit baseDir
+
+        // Setup variables
+        let fullUri = Uri($"http://127.0.0.1:8080/{releasePath}")
+        let host = fullUri.Host
+        let segments = fullUri.Segments
+        let fileName = "checksums.txt"
+
+        let repo: Repo =
+            { kind = Github
+              user = "asfaload"
+              repo = "asfald"
+              checksums = [ "checksums.txt"; "checksums_512.txt" ] }
+
+        let publishedAt = Nullable<DateTimeOffset>(DateTimeOffset.Now.AddDays(-1))
+        let! r = downloadReleaseChecksums baseDir (fullUri.ToString()) publishedAt repo
+
+        r
+        |> should
+            equal
+            [| (Some $"{baseDir}/{host}/{releasePath}/checksums.txt")
+               (Some $"{baseDir}/{host}/{releasePath}/checksums_512.txt")
+               // The None is the return of the async generating the index file
+               None |]
+
+        ()
     }

@@ -216,7 +216,12 @@ module ChecksumsCollector =
         }
 
 
-    let downloadReleaseChecksums (releaseHtmlUrl: string) (releasePublishedAt: Nullable<DateTimeOffset>) (r: Repo) =
+    let downloadReleaseChecksums
+        (baseDir: string)
+        (releaseHtmlUrl: string)
+        (releasePublishedAt: Nullable<DateTimeOffset>)
+        (r: Repo)
+        =
         let toOption (nullable: Nullable<_>) =
             if nullable.HasValue then Some nullable.Value else None
 
@@ -256,6 +261,8 @@ module ChecksumsCollector =
                     else
                         printfn "not generating index for inexisting directory %s" downloadDir
 
+                    // As we run this async at the same level as the asyncs downloading checksums
+                    // files, we return None here to be sure it is not handled as a checksums file
                     return None
                 }
 
@@ -341,7 +348,7 @@ module ChecksumsCollector =
             let! updatedRepo = updateChecksumsNames validatedRelease repo
 
             let! optionsArray =
-                downloadReleaseChecksums validatedRelease.HtmlUrl validatedRelease.PublishedAt updatedRepo
+                downloadReleaseChecksums baseDir validatedRelease.HtmlUrl validatedRelease.PublishedAt updatedRepo
 
             // If we downloaded a new checksums file, we need to commit
             if optionsArray |> Array.exists (fun o -> o.IsSome) then
