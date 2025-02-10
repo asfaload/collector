@@ -97,9 +97,12 @@ module ChecksumsCollector =
             // Path exists, return Some to continue processing
             Some absoluteDirPath
         else
-            let dir = Directory.CreateDirectory absoluteDirPath
-            // Return None when directory cannot be created, to stop further processing
-            if dir.Exists then Some absoluteDirPath else None
+            try
+                let dir = Directory.CreateDirectory absoluteDirPath
+                // Return None when directory cannot be created, to stop further processing
+                if dir.Exists then Some absoluteDirPath else None
+            with e ->
+                None
 
     // Returns None if no download took place
     let downloadChecksums (checksumsUri: Uri) destinationDir =
