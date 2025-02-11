@@ -241,3 +241,26 @@ let test_downloadReleaseChecksums () =
 
         ()
     }
+
+[<Test>]
+let test_updateChecksumsNames () =
+    let repo =
+        { kind = Github
+          user = "asfaload"
+          repo = "asfald"
+          checksums = [] }
+
+    let assetNames =
+        [| "checksums.txt"
+           "checksums_512.txt"
+           "my_soft.tgz.sha256"
+           "my_soft.tgz"
+           "lib.tgz" |]
+
+    let r = updateChecksumsNames assetNames repo
+
+    r
+    |> should
+        equal
+        { repo with
+            checksums = [ "checksums.txt"; "checksums_512.txt"; "my_soft.tgz.sha256" ] }
