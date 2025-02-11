@@ -69,6 +69,21 @@ module Queue =
             ($"releases_callback.new.{user}/{repo}")
             callbackBody
 
+    let getNextAndAck (streamName: string) (subjects: string array) (configName: string) (timeout: TimeSpan) =
+        task {
+            let! stream = getStream streamName subjects
+            let! consumer = stream.CreateOrUpdateConsumerAsync(new ConsumerConfig(configName))
+
+            let! next = consumer.NextAsync<string>(null, NatsJSNextOpts(Expires = Nullable<TimeSpan>(timeout)))
+            //consumer.NextAsync<string>()
+
+            if next.HasValue then
+                do! next.Value.AckAsync()
+                return Some(next.Value.Data)
+            else
+                return None
+        }
+
     let consumeRepoReleases (f: Repo -> unit) =
         task {
             let! stream = getStream "RELEASES" [| "releases.>" |]
