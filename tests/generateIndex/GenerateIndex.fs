@@ -179,3 +179,90 @@ let test_handleChecksumsFile () =
              hash = "c5348c321bcbede39828346bdb2f48f87956ebc2" }
 
            |]
+
+[<Test>]
+let test_handleChecksumsInLeaf () =
+    let publishedOn = Some <| System.DateTimeOffset.Now.AddDays(-1)
+    let mirroredOn = Some <| System.DateTimeOffset.Now.AddMinutes(-5)
+
+    let publishedFiles =
+        [| { fileName = "man.local"
+             algo = Sha512
+             source = "checksums_512_standard.txt"
+             hash =
+               "9a77d4f1b799b75a1b7e1c78b47393ef8b7f1107a1d8a8ab903f2b95150b756e54bd1fcde87d4c48dbfda5b6db28d32974123a7bddd73b07bf75c0c48e9f4854" }
+           { fileName = "mdoc.local"
+             algo = Sha512
+             source = "checksums_512_standard.txt"
+             hash =
+               "4ac54acf77ee3ac6aef0585c601775dcc7edcd46184535032ea61b20cf2068d7e09a727b7a00ad02d8273dec9e5366e09c995b16e5058870ea997cc7640dc910" }
+           { fileName = "man.local"
+             algo = Sha256
+             source = "checksums_256_standard.txt"
+             hash = "600a366f00ab57d469745d05b89f6976d68a29dd1b39196f4b86340b66224b31" }
+           { fileName = "mdoc.local"
+             algo = Sha256
+             source = "checksums_256_standard.txt"
+             hash = "da4f2bd8b36d5469598d93c08fe2c87f46868d123ab85f8d1c5a8f686f3666b9" } |]
+
+    let r =
+        handleChecksumsFilesInLeaf
+            "./fixtures/handleChecksumsInLeaf/asfaload/asfald/release/v0.0.1/"
+            publishedOn
+            mirroredOn
+
+    r
+    |> should
+        equal
+        { mirroredOn = mirroredOn
+          publishedOn = publishedOn
+          version = 1
+          publishedFiles = publishedFiles }
+
+    // Without published or mirrored on info
+    let r =
+        handleChecksumsFilesInLeaf "./fixtures/handleChecksumsInLeaf/asfaload/asfald/release/v0.0.1/" None None
+
+    r
+    |> should
+        equal
+        { mirroredOn = None
+          publishedOn = None
+          version = 1
+          publishedFiles = publishedFiles }
+
+
+    // Tests with multiple files each holding one checksum
+    // ---------------------------------------------------
+
+    let r =
+        handleChecksumsFilesInLeaf
+            "./fixtures/handleChecksumsInLeaf/charles/chaplet/release/v2.0.1/"
+            publishedOn
+            mirroredOn
+
+    r
+    |> should
+        equal
+        { mirroredOn = mirroredOn
+          publishedOn = publishedOn
+          version = 1
+          publishedFiles =
+            [| { fileName = "mdoc.local"
+                 algo = Sha256
+                 source = "mdoc.local.sha256"
+                 hash = "da4f2bd8b36d5469598d93c08fe2c87f46868d123ab85f8d1c5a8f686f3666b9" }
+               { fileName = "mdoc.local"
+                 algo = Sha512
+                 source = "mdoc.local.sha512"
+                 hash =
+                   "4ac54acf77ee3ac6aef0585c601775dcc7edcd46184535032ea61b20cf2068d7e09a727b7a00ad02d8273dec9e5366e09c995b16e5058870ea997cc7640dc910" }
+               { fileName = "man.local"
+                 algo = Sha512
+                 source = "man.local.sha512"
+                 hash =
+                   "9a77d4f1b799b75a1b7e1c78b47393ef8b7f1107a1d8a8ab903f2b95150b756e54bd1fcde87d4c48dbfda5b6db28d32974123a7bddd73b07bf75c0c48e9f4854" }
+               { fileName = "man.local"
+                 algo = Sha256
+                 source = "man.local.sha256"
+                 hash = "600a366f00ab57d469745d05b89f6976d68a29dd1b39196f4b86340b66224b31" } |] }
