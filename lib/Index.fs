@@ -65,6 +65,7 @@ module Index =
     let hasHashLength (s: string) =
         List.contains (s.Length) [ 32; 40; 64; 128 ]
 
+
     let handleChecksumFile (path: string) : FilesChecksums =
         File.ReadLines path
         |> Seq.filter filterLines
@@ -99,7 +100,9 @@ module Index =
                         || FileInfo(path).Extension.EndsWith "512")
                     ->
                     let extension = FileInfo(path).Extension
-                    Some(sha, path.Substring(0, path.LastIndexOf(extension)))
+                    // Only use the filename, and ignore the possible path to it
+                    let fileName = FileInfo(path).Name
+                    Some(sha, fileName.Substring(0, fileName.LastIndexOf(extension)))
                 | a ->
                     printfn "Impossible to infer filename: %A in file %s" a path
 
