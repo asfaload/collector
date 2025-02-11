@@ -57,3 +57,125 @@ let test_hasHashLength () =
     |> Array.iter (fun h -> h |> hasHashLength |> should equal true)
 
     "other length string" |> hasHashLength |> should equal false
+
+[<Test>]
+let test_handleChecksumsFile () =
+    let r = handleChecksumFile "./fixtures/handleChecksumsFile/combined.txt"
+
+    // sha256 and 512 in same file, separated by a comment line
+    r
+    |> should
+        equal
+        [| { fileName = "man.local"
+             algo = Sha256
+             source = "combined.txt"
+             hash = "600a366f00ab57d469745d05b89f6976d68a29dd1b39196f4b86340b66224b31" }
+           { fileName = "mdoc.local"
+             algo = Sha256
+             source = "combined.txt"
+             hash = "da4f2bd8b36d5469598d93c08fe2c87f46868d123ab85f8d1c5a8f686f3666b9" }
+           { fileName = "man.local"
+             algo = Sha512
+             source = "combined.txt"
+             hash =
+               "9a77d4f1b799b75a1b7e1c78b47393ef8b7f1107a1d8a8ab903f2b95150b756e54bd1fcde87d4c48dbfda5b6db28d32974123a7bddd73b07bf75c0c48e9f4854" }
+           { fileName = "mdoc.local"
+             algo = Sha512
+             source = "combined.txt"
+             hash =
+               "4ac54acf77ee3ac6aef0585c601775dcc7edcd46184535032ea61b20cf2068d7e09a727b7a00ad02d8273dec9e5366e09c995b16e5058870ea997cc7640dc910" } |]
+
+
+    // standard sha256sum
+    let r =
+        handleChecksumFile "./fixtures/handleChecksumsFile/checksums_256_standard.txt"
+
+    r
+    |> should
+        equal
+        [| { fileName = "man.local"
+             algo = Sha256
+             source = "checksums_256_standard.txt"
+             hash = "600a366f00ab57d469745d05b89f6976d68a29dd1b39196f4b86340b66224b31" }
+           { fileName = "mdoc.local"
+             algo = Sha256
+             source = "checksums_256_standard.txt"
+             hash = "da4f2bd8b36d5469598d93c08fe2c87f46868d123ab85f8d1c5a8f686f3666b9" } |]
+
+
+    // standard sha512sum
+    let r =
+        handleChecksumFile "./fixtures/handleChecksumsFile/checksums_512_standard.txt"
+
+    r
+    |> should
+        equal
+        [| { fileName = "man.local"
+             algo = Sha512
+             source = "checksums_512_standard.txt"
+             hash =
+               "9a77d4f1b799b75a1b7e1c78b47393ef8b7f1107a1d8a8ab903f2b95150b756e54bd1fcde87d4c48dbfda5b6db28d32974123a7bddd73b07bf75c0c48e9f4854" }
+           { fileName = "mdoc.local"
+             algo = Sha512
+             source = "checksums_512_standard.txt"
+             hash =
+               "4ac54acf77ee3ac6aef0585c601775dcc7edcd46184535032ea61b20cf2068d7e09a727b7a00ad02d8273dec9e5366e09c995b16e5058870ea997cc7640dc910" } |]
+
+    let r = handleChecksumFile "./fixtures/handleChecksumsFile/man.local.sha256"
+
+    // sha256 in same filename with suffix
+    r
+    |> should
+        equal
+        [| { fileName = "man.local"
+             algo = Sha256
+             source = "man.local.sha256"
+             hash = "600a366f00ab57d469745d05b89f6976d68a29dd1b39196f4b86340b66224b31" }
+
+           |]
+
+    // sha512 in same filename with suffix
+    let r = handleChecksumFile "./fixtures/handleChecksumsFile/man.local.sha512"
+
+    r
+    |> should
+        equal
+        [| { fileName = "man.local"
+             algo = Sha512
+             source = "man.local.sha512"
+             hash =
+               "9a77d4f1b799b75a1b7e1c78b47393ef8b7f1107a1d8a8ab903f2b95150b756e54bd1fcde87d4c48dbfda5b6db28d32974123a7bddd73b07bf75c0c48e9f4854" } |]
+
+    // md5sum
+    let r = handleChecksumFile "./fixtures/handleChecksumsFile/checksums_md5.txt"
+
+    r
+    |> should
+        equal
+        [| { fileName = "man.local"
+             algo = Md5
+             source = "checksums_md5.txt"
+             hash = "e6591616404c7c443f71ff21d27430d7" }
+           { fileName = "mdoc.local"
+             algo = Md5
+             source = "checksums_md5.txt"
+             hash = "4bc6267468942826b757fa2f868c8237" }
+
+           |]
+
+    // sha1sum
+    let r = handleChecksumFile "./fixtures/handleChecksumsFile/checksums_sha1.txt"
+
+    r
+    |> should
+        equal
+        [| { fileName = "man.local"
+             algo = Sha1
+             source = "checksums_sha1.txt"
+             hash = "e65ef2997ff54bbb09bd4a2070bb75cd94aba538" }
+           { fileName = "mdoc.local"
+             algo = Sha1
+             source = "checksums_sha1.txt"
+             hash = "c5348c321bcbede39828346bdb2f48f87956ebc2" }
+
+           |]

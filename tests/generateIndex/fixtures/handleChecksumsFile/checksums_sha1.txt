@@ -1,0 +1,2 @@
+e65ef2997ff54bbb09bd4a2070bb75cd94aba538  man.local
+c5348c321bcbede39828346bdb2f48f87956ebc2  mdoc.local
