@@ -311,13 +311,9 @@ module ChecksumsCollector =
             | Net.HttpStatusCode.OK ->
                 let json = response |> Response.toJson
 
-                let checksumsFiles =
-                    json.AsArray()
-                    |> Array.map (fun e -> e?name.ToString())
-                    |> ChecksumHelpers.filterChecksums
+                let assets = json.AsArray() |> Array.map (fun e -> e?name.ToString())
 
-                printfn "found checksums files %A" checksumsFiles
-                return { repo with checksums = checksumsFiles }
+                return! updateChecksumsNames assets repo
             | _ ->
                 printfn
                     "%s we got an error for %s/%s: %s!\n%s\nWe sleep one hour.\nHeader retry-after= %s "
