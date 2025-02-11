@@ -29,3 +29,16 @@ let test_getLeafDirectories () =
         equal
         [| "./fixtures/getLeafDirectories/src/js"
            "./fixtures/getLeafDirectories/src/fsharp/lib" |]
+
+[<Test>]
+let test_filterLines () =
+    // ignore comment lines
+    "# this is a comment line" |> filterLines |> should equal false
+    // ignore empty lines
+    "" |> filterLines |> should equal false
+    // sha256 line
+    "3cb16133432cffbd2433a31a41a65fa4b6ab58ad527d5c6a9cfe8c093a4306fd  myfile"
+    |> filterLines
+    |> should equal true
+    // Non-empty line
+    "blabla" |> filterLines |> should equal true
