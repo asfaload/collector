@@ -270,7 +270,10 @@ module ChecksumsCollector =
 
         }
 
-    let updateChecksumsNames (release: Release) (repo: Repo) =
+    let getReleaseAssetNames (release: Release) =
+        release.Assets |> Seq.map (fun a -> a.Name)
+
+    let updateChecksumsNames (assets: string seq) (repo: Repo) =
         async {
 
             if (isNull (Environment.GetEnvironmentVariable("DEBUG"))) then
@@ -278,8 +281,7 @@ module ChecksumsCollector =
 
 
 
-            let checksumsFiles =
-                release.Assets |> Seq.map (fun a -> a.Name) |> ChecksumHelpers.filterChecksums
+            let checksumsFiles = assets |> ChecksumHelpers.filterChecksums
 
             printfn "found checksums files %A" checksumsFiles
             return { repo with checksums = checksumsFiles }
@@ -345,7 +347,8 @@ module ChecksumsCollector =
         async {
 
             let! validatedRelease = validateRelease repo release
-            let! updatedRepo = updateChecksumsNames validatedRelease repo
+            let assetNames = validatedRelease |> getReleaseAssetNames
+            let! updatedRepo = updateChecksumsNames assetNames repo
 
             let! optionsArray =
                 downloadReleaseChecksums baseDir validatedRelease.HtmlUrl validatedRelease.PublishedAt updatedRepo
