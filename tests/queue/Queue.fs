@@ -8,6 +8,7 @@ open FsUnit
 
 
 open System
+open System.IO
 
 
 [<SetUp>]
@@ -28,8 +29,14 @@ let TearDown () =
         // This is because work queue do not accept multiple consumers with overlapping filters
         // Delete our consumer so other tests can run
         let! _consumerDeleted = deleteConsumerIfExists "RELEASES" [| "releases.>" |] "test_consumer_config"
-        // Delete the consumer so other tests can run without a need to stop the nats server
         let! _consumerDeleted = deleteConsumerIfExists "RELEASES" [| "releases.>" |] "releases_processor"
+
+        let! _consumerDeleted =
+            deleteConsumerIfExists "RELEASES_CALLBACK" [| "releases_callback.>" |] "test_consumer_config"
+
+        let! _consumerDeleted =
+            deleteConsumerIfExists "RELEASES_CALLBACK" [| "releases_callback.>" |] "releases_processor"
+
         ()
 
     }
@@ -122,5 +129,34 @@ let test_publishRepoReleaseAndItsConsumer () =
         let! _consumerDeleted = deleteConsumerIfExists "RELEASES" [| "releases.>" |] "releases_processor"
         // We didn't publish anything else, so nothing back
         let! msg = getNextAndAck "RELEASES" "releases.>" "test_consumer_config" (TimeSpan.FromMilliseconds(1000))
+        msg |> should equal None
+    }
+
+[<Test>]
+let test_publishCallbackReleaseAndItsConsumer () =
+    task {
+
+        do! publishCallbackRelease "asfaload" "asfald" (File.ReadAllText("./utils/ReleaseActionBodySample.json"))
+
+        let mutable acc: string array = [||]
+
+        do!
+            consumeCallbackRelease (fun root ->
+                acc <- (Array.append acc [| sprintf "%s/%s" (root.Release.Author.Login) (root.Repository.Name) |]))
+
+        acc |> should equal [| "rbauduin/TestRepo" |]
+
+        // Remove consumer so we can check the work queue is now empty
+        // This is because work queue do not accept multiple consumers with overlapping filters
+        let! _consumerDeleted =
+            deleteConsumerIfExists "RELEASES_CALLBACK" [| "releases_callback.>" |] "releases_callback_processor"
+        // We didn't publish anything else, so nothing back
+        let! msg =
+            getNextAndAck
+                "RELEASES_CALLBACK"
+                "releases_callback.>"
+                "test_consumer_config"
+                (TimeSpan.FromMilliseconds(1000))
+
         msg |> should equal None
     }
