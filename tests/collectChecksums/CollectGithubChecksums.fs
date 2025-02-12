@@ -239,6 +239,9 @@ let test_downloadReleaseChecksums () =
                // The None is the return of the async generating the index file
                None |]
 
+        File.Exists($"{baseDir}/{host}/{releasePath}/asfaload.index.json2")
+        |> should equal true
+
         ()
     }
 
