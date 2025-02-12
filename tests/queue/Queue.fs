@@ -31,11 +31,11 @@ let test_publishToQueue () =
         let subjects = [| "tests.>" |]
         let q = "tests.testPublisToQueue.1"
         do! publishToQueue stream subjects q "my serialise value"
-        let! msg = getNextAndAck "TEST" [| "tests.>" |] "test_consumer_config" (TimeSpan.FromMilliseconds(1000))
+        let! msg = getNextAndAck "TEST" "tests.>" "test_consumer_config" (TimeSpan.FromMilliseconds(1000))
         msg |> should equal (Some "my serialise value")
 
         // We didn't publish anything else, so nothing back
-        let! msg = getNextAndAck "TEST" [| "tests.>" |] "test_consumer_config" (TimeSpan.FromMilliseconds(1000))
+        let! msg = getNextAndAck "TEST" "tests.>" "test_consumer_config" (TimeSpan.FromMilliseconds(1000))
         msg |> should equal None
     }
 
@@ -50,13 +50,13 @@ let test_publishRepoRelease () =
               checksums = [] }
 
         do! publishRepoRelease repo
-        let! msg = getNextAndAck "RELEASES" [| "releases.>" |] "test_consumer_config" (TimeSpan.FromMilliseconds(1000))
+        let! msg = getNextAndAck "RELEASES" "releases.>" "test_consumer_config" (TimeSpan.FromMilliseconds(1000))
 
         msg
         |> should equal (Some """{"kind":{"Case":"Github"},"user":"asfaload","repo":"asfald","checksums":[]}""")
 
         // We didn't publish anything else, so nothing back
-        let! msg = getNextAndAck "RELEASES" [| "releases.>" |] "test_consumer_config" (TimeSpan.FromMilliseconds(1000))
+        let! msg = getNextAndAck "RELEASES" "releases.>" "test_consumer_config" (TimeSpan.FromMilliseconds(1000))
         msg |> should equal None
     }
 
@@ -69,7 +69,7 @@ let test_publishCallbackRelease () =
         let! msg =
             getNextAndAck
                 "RELEASES_CALLBACK"
-                [| "releases_callback.>" |]
+                "releases_callback.>"
                 "test_consumer_config"
                 (TimeSpan.FromMilliseconds(1000))
 
@@ -79,7 +79,7 @@ let test_publishCallbackRelease () =
         let! msg =
             getNextAndAck
                 "RELEASES_CALLBACK"
-                [| "releases_callback.>" |]
+                "releases_callback.>"
                 "test_consumer_config"
                 (TimeSpan.FromMilliseconds(1000))
 

@@ -69,10 +69,12 @@ module Queue =
             ($"releases_callback.new.{user}/{repo}")
             callbackBody
 
-    let getNextAndAck (streamName: string) (subjects: string array) (configName: string) (timeout: TimeSpan) =
+    let getNextAndAck (streamName: string) (subject: string) (configName: string) (timeout: TimeSpan) =
         task {
-            let! stream = getStream streamName subjects
-            let! consumer = stream.CreateOrUpdateConsumerAsync(new ConsumerConfig(configName))
+            let! stream = getStream streamName [| subject |]
+            let consumerConfig = new ConsumerConfig(configName)
+            consumerConfig.FilterSubject <- subject
+            let! consumer = stream.CreateOrUpdateConsumerAsync(consumerConfig)
 
             let! next = consumer.NextAsync<string>(null, NatsJSNextOpts(Expires = Nullable<TimeSpan>(timeout)))
             //consumer.NextAsync<string>()
