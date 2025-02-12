@@ -1,0 +1,1 @@
+../collectChecksums/Makefile
