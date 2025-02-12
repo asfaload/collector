@@ -21,6 +21,18 @@ let OneTimeSetup () =
 [<OneTimeTearDown>]
 let OneTimeTearDown () = System.Diagnostics.Trace.Flush()
 
+[<TearDown>]
+let TearDown () =
+    task {
+        // Delete consumers so that all tests starts with no consumer defined
+        // This is because work queue do not accept multiple consumers with overlapping filters
+        // Delete our consumer so other tests can run
+        let! _consumerDeleted = deleteConsumerIfExists "RELEASES" [| "releases.>" |] "test_consumer_config"
+        // Delete the consumer so other tests can run without a need to stop the nats server
+        let! _consumerDeleted = deleteConsumerIfExists "RELEASES" [| "releases.>" |] "releases_processor"
+        ()
+
+    }
 
 
 [<Test>]
