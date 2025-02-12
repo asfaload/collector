@@ -70,6 +70,7 @@ let test_publishRepoRelease () =
         // We didn't publish anything else, so nothing back
         let! msg = getNextAndAck "RELEASES" "releases.>" "test_consumer_config" (TimeSpan.FromMilliseconds(1000))
         msg |> should equal None
+
     }
 
 [<Test>]
@@ -95,5 +96,31 @@ let test_publishCallbackRelease () =
                 "test_consumer_config"
                 (TimeSpan.FromMilliseconds(1000))
 
+        msg |> should equal None
+    }
+
+[<Test>]
+let test_publishRepoReleaseAndItsConsumer () =
+    task {
+
+        let repo: Repo =
+            { repo = "asfald"
+              user = "asfaload"
+              kind = Github
+              checksums = [] }
+
+        do! publishRepoRelease repo
+
+        let mutable acc: string array = [||]
+
+        do! consumeRepoReleases (fun repo -> acc <- (Array.append acc [| sprintf "%s/%s" repo.user repo.repo |]))
+
+        acc |> should equal [| "asfaload/asfald" |]
+
+        // Remove consumer so we can check the work queue is now empty
+        // This is because work queue do not accept multiple consumers with overlapping filters
+        let! _consumerDeleted = deleteConsumerIfExists "RELEASES" [| "releases.>" |] "releases_processor"
+        // We didn't publish anything else, so nothing back
+        let! msg = getNextAndAck "RELEASES" "releases.>" "test_consumer_config" (TimeSpan.FromMilliseconds(1000))
         msg |> should equal None
     }
