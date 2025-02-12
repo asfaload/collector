@@ -59,3 +59,29 @@ let test_publishRepoRelease () =
         let! msg = getNextAndAck "RELEASES" [| "releases.>" |] "test_consumer_config" (TimeSpan.FromMilliseconds(1000))
         msg |> should equal None
     }
+
+[<Test>]
+let test_publishCallbackRelease () =
+    task {
+
+        do! publishCallbackRelease "asfaload" "asfald" """{"in_test": "true"}"""
+
+        let! msg =
+            getNextAndAck
+                "RELEASES_CALLBACK"
+                [| "releases_callback.>" |]
+                "test_consumer_config"
+                (TimeSpan.FromMilliseconds(1000))
+
+        msg |> should equal (Some """{"in_test": "true"}""")
+
+        // We didn't publish anything else, so nothing back
+        let! msg =
+            getNextAndAck
+                "RELEASES_CALLBACK"
+                [| "releases_callback.>" |]
+                "test_consumer_config"
+                (TimeSpan.FromMilliseconds(1000))
+
+        msg |> should equal None
+    }
