@@ -126,7 +126,7 @@ let app: WebPart =
 
 
           POST
-          >=> path "/notify_github_release"
+          >=> path "/add"
           >=> request (fun req ->
               match req["auth"] with
               | Some "1348LLN" ->

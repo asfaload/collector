@@ -33,10 +33,15 @@ module Index =
 
     let INDEX_NAME = "asfaload.index.json"
 
+    // Returns seq of leaf directories, skipping hidden directories. This means that
+    // 1. Leaf directories whose name start with '.' are not included, and their parent are not either
+    //    as they are not leaf directories
+    // 2. All subdirs of a hidden directory are also ignore and not reported as leaf directory.
     let rec getLeafDirectories (root: string) =
         seq {
             // ignore hidden directories like eg .git
             if DirectoryInfo(root).Name.StartsWith "." then
+                printfn "ignorin %s starting with dot" root
                 ()
             else
                 let subDirs = Directory.EnumerateDirectories root
@@ -59,6 +64,7 @@ module Index =
 
     let hasHashLength (s: string) =
         List.contains (s.Length) [ 32; 40; 64; 128 ]
+
 
     let handleChecksumFile (path: string) : FilesChecksums =
         File.ReadLines path
@@ -94,7 +100,9 @@ module Index =
                         || FileInfo(path).Extension.EndsWith "512")
                     ->
                     let extension = FileInfo(path).Extension
-                    Some(sha, path.Substring(0, path.LastIndexOf(extension)))
+                    // Only use the filename, and ignore the possible path to it
+                    let fileName = FileInfo(path).Name
+                    Some(sha, fileName.Substring(0, fileName.LastIndexOf(extension)))
                 | a ->
                     printfn "Impossible to infer filename: %A in file %s" a path
 

@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+
+    <IsPackable>false</IsPackable>
+    <GenerateProgramFile>false</GenerateProgramFile>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../lib/Limits.fs" />
+    <Compile Include="../../lib/db.fs" />
+    <Compile Include="../../lib/Shared.fs" />
+    <Compile Include="../../lib/Queue.fs" />
+    <Compile Include="Queue.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AltCover" Version="9.0.1" />
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="FsUnit" Version="7.0.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="NUnit" Version="4.3.2" />
+    <PackageReference Include="NUnit.Analyzers" Version="4.6.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="5.0.0-beta.7" />
+
+    <PackageReference Include="DbFun.Core" Version="1.1.0" />
+    <PackageReference Include="Fli" Version="1.111.10" />
+    <PackageReference Include="FSharp.Control.TaskSeq" Version="0.4.0" />
+    <PackageReference Include="Fsharp.Data" Version="6.4.0" />
+    <PackageReference Include="FSharp.SystemTextJson" Version="1.3.13" />
+    <PackageReference Include="FsHttp" Version="14.5.1" />
+    <PackageReference Include="FsHttp.FSharpData" Version="14.5.1" />
+    <PackageReference Include="NATS.Net" Version="2.5.2" />
+    <PackageReference Include="Octokit" Version="13.0.1" />
+    <PackageReference Include="System.Data.SQLite" Version="1.0.119" />
+
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="fixtures/**" CopyToOutputDirectory="Always" />
+    <None Include="utils/**" CopyToOutputDirectory="Always" />
+  </ItemGroup>
+
+</Project>

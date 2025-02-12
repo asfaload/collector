@@ -69,6 +69,49 @@ module Queue =
             ($"releases_callback.new.{user}/{repo}")
             callbackBody
 
+    let getNextAndAck (streamName: string) (subject: string) (configName: string) (timeout: TimeSpan) =
+        task {
+            let! stream = getStream streamName [| subject |]
+            let consumerConfig = new ConsumerConfig(configName)
+            consumerConfig.FilterSubject <- subject
+            let! consumer = stream.CreateOrUpdateConsumerAsync(consumerConfig)
+
+            let! next = consumer.NextAsync<string>(null, NatsJSNextOpts(Expires = Nullable<TimeSpan>(timeout)))
+            //consumer.NextAsync<string>()
+
+            if next.HasValue then
+                do! next.Value.AckAsync()
+                return Some(next.Value.Data)
+            else
+                return None
+        }
+
+    // Durable consumers are persistent and created at the NATS side. So even when
+    // the program exits, the consumer stays. This allows to delete a consumer,
+    // and is particularly useful in tests.
+    let deleteConsumerIfExists (streamName: string) (subjects: string array) (name: string) =
+        task {
+            let! stream = getStream streamName subjects
+
+            try
+                let! success = stream.DeleteConsumerAsync(name)
+                return success
+            with
+            | :? NATS.Client.JetStream.NatsJSApiException as e ->
+                // if the consumer is not found, consider it as deleted
+                if e.Message = "consumer not found" then
+                    return true
+                else
+                    raise e
+                    return Unchecked.defaultof<_> ()
+            | e ->
+                raise e
+                return Unchecked.defaultof<_> ()
+
+
+
+        }
+
     let consumeRepoReleases (f: Repo -> unit) =
         task {
             let! stream = getStream "RELEASES" [| "releases.>" |]

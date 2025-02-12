@@ -18,6 +18,7 @@ module ChecksumsCollector =
 
 
     let CHECKSUMS = ChecksumHelpers.CHECKSUMS
+    let baseDir = Environment.GetEnvironmentVariable "BASE_DIR"
 
     let gitMutex = new System.Threading.Mutex()
 
@@ -28,7 +29,7 @@ module ChecksumsCollector =
         cli {
             Exec "git"
             Arguments [ "commit"; "-m"; subject ]
-            WorkingDirectory(Environment.GetEnvironmentVariable "BASE_DIR")
+            WorkingDirectory(baseDir)
         }
         |> Command.execute
         |> Output.throwIfErrored
@@ -45,7 +46,7 @@ module ChecksumsCollector =
             cli {
                 Exec "git"
                 Arguments [ "rev-list"; "--count"; "origin/master..master" ]
-                WorkingDirectory(Environment.GetEnvironmentVariable "BASE_DIR")
+                WorkingDirectory(baseDir)
             }
             |> Command.execute
             |> Output.throwIfErrored
@@ -56,7 +57,7 @@ module ChecksumsCollector =
             cli {
                 Exec "git"
                 Arguments [ "push" ]
-                WorkingDirectory(Environment.GetEnvironmentVariable "BASE_DIR")
+                WorkingDirectory(baseDir)
             }
             |> Command.execute
             |> Output.throwIfErrored
@@ -66,14 +67,14 @@ module ChecksumsCollector =
         gitMutex.ReleaseMutex()
         ()
 
-    let gitAdd (path: string) =
+    let gitAdd (baseDir: string) (path: string) =
         gitMutex.WaitOne() |> ignore
         printfn "running git add %s" path
 
         cli {
             Exec "git"
             Arguments [ "add"; path ]
-            WorkingDirectory(Environment.GetEnvironmentVariable "BASE_DIR")
+            WorkingDirectory(baseDir)
         }
         |> Command.execute
         |> Output.throwIfErrored
@@ -84,9 +85,9 @@ module ChecksumsCollector =
 
     // Returns Some only if the directory was created.
     // If the directory existed or in case of error, returns None
-    let createReleaseDir (path: string) =
+    let createReleaseDir (baseDir: string) (path: string) =
         printfn "createReleaseDir got path %s" path
-        let baseDir = Environment.GetEnvironmentVariable("BASE_DIR")
+
         printfn "basedir = %s" baseDir
         // Second path needs to be relative, or it iss returned as result.....
         let absoluteDirPath = Path.Combine(baseDir, path)
@@ -96,9 +97,12 @@ module ChecksumsCollector =
             // Path exists, return Some to continue processing
             Some absoluteDirPath
         else
-            let dir = Directory.CreateDirectory absoluteDirPath
-            // Return None when directory cannot be created, to stop further processing
-            if dir.Exists then Some absoluteDirPath else None
+            try
+                let dir = Directory.CreateDirectory absoluteDirPath
+                // Return None when directory cannot be created, to stop further processing
+                if dir.Exists then Some absoluteDirPath else None
+            with e ->
+                None
 
     // Returns None if no download took place
     let downloadChecksums (checksumsUri: Uri) destinationDir =
@@ -142,7 +146,12 @@ module ChecksumsCollector =
         |> Array.append [| host |]
         |> Path.Combine
 
-    let downloadIndividualChecksumsFile (lastUri: Uri) (downloadSegments: string array) (filename: string) =
+    let downloadIndividualChecksumsFile
+        (baseDir: string)
+        (lastUri: Uri)
+        (downloadSegments: string array)
+        (filename: string)
+        =
         async {
             let checksumsSegments = Array.append downloadSegments [| filename |]
             let checksumsPath = Path.Join(checksumsSegments)
@@ -151,9 +160,9 @@ module ChecksumsCollector =
             let resultingOption =
                 downloadSegments
                 |> getDownloadDir lastUri.Host
-                |> createReleaseDir
+                |> createReleaseDir baseDir
                 |> Option.bind (downloadChecksums checksumsUri)
-                |> Option.map gitAdd
+                |> Option.map (gitAdd baseDir)
 
 
             match resultingOption with
@@ -207,7 +216,12 @@ module ChecksumsCollector =
         }
 
 
-    let downloadReleaseChecksums (release: Release) (r: Repo) =
+    let downloadReleaseChecksums
+        (baseDir: string)
+        (releaseHtmlUrl: string)
+        (releasePublishedAt: Nullable<DateTimeOffset>)
+        (r: Repo)
+        =
         let toOption (nullable: Nullable<_>) =
             if nullable.HasValue then Some nullable.Value else None
 
@@ -215,7 +229,7 @@ module ChecksumsCollector =
             printfn "Running downloadLast for %s/%s" r.user r.repo
 
 
-            let lastUri = System.Uri(release.HtmlUrl)
+            let lastUri = System.Uri(releaseHtmlUrl)
 
             let downloadSegments =
                 lastUri.Segments |> Array.map (fun s -> if s = "tag/" then "download/" else s)
@@ -225,13 +239,12 @@ module ChecksumsCollector =
                 |> List.map (fun name ->
                     async {
                         do! Async.Sleep 1000
-                        return! downloadIndividualChecksumsFile lastUri downloadSegments name
+                        return! downloadIndividualChecksumsFile baseDir lastUri downloadSegments name
                     })
 
             let relativeDownloadDir = getDownloadDir lastUri.Host downloadSegments
 
-            let downloadDir =
-                Path.Combine(System.Environment.GetEnvironmentVariable("BASE_DIR"), relativeDownloadDir)
+            let downloadDir = Path.Combine(baseDir, relativeDownloadDir)
 
 
             let generateIndexAsync =
@@ -241,13 +254,15 @@ module ChecksumsCollector =
 
                         Index.generateChecksumsList
                             downloadDir
-                            (toOption release.PublishedAt)
+                            (toOption releasePublishedAt)
                             (Some DateTimeOffset.UtcNow)
 
-                        gitAdd downloadDir |> ignore
+                        gitAdd baseDir downloadDir |> ignore
                     else
                         printfn "not generating index for inexisting directory %s" downloadDir
 
+                    // As we run this async at the same level as the asyncs downloading checksums
+                    // files, we return None here to be sure it is not handled as a checksums file
                     return None
                 }
 
@@ -255,7 +270,10 @@ module ChecksumsCollector =
 
         }
 
-    let updateChecksumsNames (release: Release) (repo: Repo) =
+    let getReleaseAssetNames (release: Release) =
+        release.Assets |> Seq.map (fun a -> a.Name)
+
+    let updateChecksumsNames (assets: string seq) (repo: Repo) =
         async {
 
             if (isNull (Environment.GetEnvironmentVariable("DEBUG"))) then
@@ -263,8 +281,7 @@ module ChecksumsCollector =
 
 
 
-            let checksumsFiles =
-                release.Assets |> Seq.map (fun a -> a.Name) |> ChecksumHelpers.filterChecksums
+            let checksumsFiles = assets |> ChecksumHelpers.filterChecksums
 
             printfn "found checksums files %A" checksumsFiles
             return { repo with checksums = checksumsFiles }
@@ -294,13 +311,9 @@ module ChecksumsCollector =
             | Net.HttpStatusCode.OK ->
                 let json = response |> Response.toJson
 
-                let checksumsFiles =
-                    json.AsArray()
-                    |> Array.map (fun e -> e?name.ToString())
-                    |> ChecksumHelpers.filterChecksums
+                let assets = json.AsArray() |> Array.map (fun e -> e?name.ToString())
 
-                printfn "found checksums files %A" checksumsFiles
-                return { repo with checksums = checksumsFiles }
+                return! updateChecksumsNames assets repo
             | _ ->
                 printfn
                     "%s we got an error for %s/%s: %s!\n%s\nWe sleep one hour.\nHeader retry-after= %s "
@@ -330,8 +343,11 @@ module ChecksumsCollector =
         async {
 
             let! validatedRelease = validateRelease repo release
-            let! updatedRepo = updateChecksumsNames validatedRelease repo
-            let! optionsArray = downloadReleaseChecksums validatedRelease updatedRepo
+            let assetNames = validatedRelease |> getReleaseAssetNames
+            let! updatedRepo = updateChecksumsNames assetNames repo
+
+            let! optionsArray =
+                downloadReleaseChecksums baseDir validatedRelease.HtmlUrl validatedRelease.PublishedAt updatedRepo
 
             // If we downloaded a new checksums file, we need to commit
             if optionsArray |> Array.exists (fun o -> o.IsSome) then
