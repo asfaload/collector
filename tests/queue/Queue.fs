@@ -160,3 +160,15 @@ let test_publishCallbackReleaseAndItsConsumer () =
 
         msg |> should equal None
     }
+
+[<Test>]
+let test_triggerRepoReleaseDownload () =
+    task {
+        do! triggerRepoReleaseDownload "asfaload" "checksum"
+        let mutable acc: string array = [||]
+
+        do! consumeRepoReleases (fun repo -> acc <- (Array.append acc [| sprintf "%s/%s" repo.user repo.repo |]))
+
+        acc |> should equal [| "asfaload/checksum" |]
+
+    }
