@@ -283,7 +283,7 @@ let test_downloadReleaseChecksums () =
                // The None is the return of the async generating the index file
                None |]
 
-        File.Exists($"{baseDir}/{host}/{releasePath}/asfaload.index.json2")
+        File.Exists($"{baseDir}/{host}/{releasePath}/asfaload.index.json")
         |> should equal true
 
         ()
@@ -329,9 +329,54 @@ let testGitPush () =
         |> should equal (Some "File added by test testGitPush\nfirst commit in remote")
 
         // push to remote
-        gitPushIfAheadInDir baseDir
+        gitPushIfAheadInDir baseDir (TimeSpan.FromMicroseconds 1)
 
         // Check commit was pushed to the remote
         gitLog remoteDir
         |> should equal (Some "File added by test testGitPush\nfirst commit in remote")
+    }
+
+[<Test>]
+let testGitCoallescedPush () =
+    async {
+        let remoteDir, baseDir = initialiseRemoteAndLocalClone ()
+        // Add another file
+        let addedFilePath = Path.Combine(baseDir, "addedFile")
+        File.WriteAllText(addedFilePath, "This file was added to the git repo after the clone")
+        gitAdd baseDir addedFilePath |> should equal addedFilePath
+        gitCommitInDir baseDir "\"File added by test testGitPush\""
+        // Check the commit is added locally
+        gitLog baseDir
+        |> should equal (Some "File added by test testGitPush\nfirst commit in remote")
+
+        // push to remote
+        gitPushIfAheadInDir baseDir (TimeSpan.FromMinutes 5)
+        // Check commit was pushed to the remote
+        gitLog remoteDir
+        |> should equal (Some "File added by test testGitPush\nfirst commit in remote")
+
+
+        // Add another file
+        let addedFilePath = Path.Combine(baseDir, "secondAddedFile")
+        File.WriteAllText(addedFilePath, "This file was added as second to the repo")
+        gitAdd baseDir addedFilePath |> should equal addedFilePath
+        gitCommitInDir baseDir "\"Second file added by test testGitPush\""
+
+        gitLog baseDir
+        |> should
+            equal
+            (Some "Second file added by test testGitPush\nFile added by test testGitPush\nfirst commit in remote")
+        // push to remote, but to rapidly after previous push
+        gitPushIfAheadInDir baseDir (TimeSpan.FromMinutes 5)
+        // Check commit was NOT pushed
+        gitLog remoteDir
+        |> should equal (Some "File added by test testGitPush\nfirst commit in remote")
+        // Now push with a lower coallescing timespan
+        do! Async.Sleep(TimeSpan.FromMilliseconds 1)
+        gitPushIfAheadInDir baseDir (TimeSpan.FromMicroseconds 1)
+
+        gitLog remoteDir
+        |> should
+            equal
+            (Some "Second file added by test testGitPush\nFile added by test testGitPush\nfirst commit in remote")
     }
