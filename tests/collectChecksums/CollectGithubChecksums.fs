@@ -33,28 +33,41 @@ let OneTimeSetup () =
 [<OneTimeTearDown>]
 let OneTimeTearDown () = System.Diagnostics.Trace.Flush()
 
-// Used to initial a git repo for tests
-let gitInit (dir: string) =
+let gitInitFull (bare: bool) (dir: string) =
     cli {
         Exec "git"
-        Arguments [ "init" ]
+        Arguments(if bare then [ "init"; "--bare" ] else [ "init" ])
         WorkingDirectory(dir)
     }
     |> Command.execute
     |> Output.throwIfErrored
     |> ignore
+// Used to initial a git repo for tests
+let gitInit = gitInitFull false
+let gitInitBare = gitInitFull true
 
 let gitLog (dir: string) =
     let r =
         cli {
             Exec "git"
-            Arguments [ "log"; "--oneline" ]
+            Arguments [ "log"; "--pretty=format:%s" ]
             WorkingDirectory(dir)
         }
         |> Command.execute
         |> Output.throwIfErrored
 
     r.Text
+
+let gitClone (remote: string) (local: string) =
+    let r =
+        cli {
+            Exec "git"
+            Arguments [ "clone"; remote; local ]
+        }
+        |> Command.execute
+        |> Output.throwIfErrored
+
+    r |> Output.toExitCode
 
 let gitDiffCached (dir: string) =
     let r =
@@ -67,6 +80,37 @@ let gitDiffCached (dir: string) =
         |> Output.throwIfErrored
 
     r.Text
+
+let initialiseRemoteAndLocalClone () =
+    // Create new bare repo as remote
+    let remoteDir = Directory.CreateTempSubdirectory().FullName
+    gitInitBare remoteDir
+
+    // Create new local clone
+    let baseDir = Directory.CreateTempSubdirectory().FullName
+    gitClone remoteDir baseDir |> should equal 0
+    // Add first file to the repo
+    let firstFile = Path.Combine(baseDir, "first_file.txt")
+    File.WriteAllText(firstFile, "This file was present on remote")
+    gitAdd baseDir firstFile |> should equal firstFile
+    gitCommitInDir baseDir "\"first commit in remote\""
+    // Check the first commit is added as expected
+    gitLog baseDir |> should equal (Some "first commit in remote")
+    //
+    // Push to the remote so it has a commit. Otherwise, the command
+    // checking if the local is ahead fails (git rev-list --count origin/master..master)
+    cli {
+        Exec "git"
+        Arguments [ "push" ]
+        WorkingDirectory(baseDir)
+    }
+    |> Command.execute
+    |> Output.throwIfErrored
+    |> ignore
+
+    // Check the first commit was pushed to the remote as expected
+    gitLog remoteDir |> should equal (Some "first commit in remote")
+    remoteDir, baseDir
 
 [<Test>]
 let test_createReleaseDir () =
@@ -269,4 +313,25 @@ let test_updateChecksumsNames () =
             { repo with
                 checksums = [ "checksums.txt"; "my_soft.tgz.sha256" ] }
 
+    }
+
+[<Test>]
+let testGitPush () =
+    async {
+        let remoteDir, baseDir = initialiseRemoteAndLocalClone ()
+        // Add another file
+        let addedFilePath = Path.Combine(baseDir, "addedFile")
+        File.WriteAllText(addedFilePath, "This file was added to the git repo after the clone")
+        gitAdd baseDir addedFilePath |> should equal addedFilePath
+        gitCommitInDir baseDir "\"File added by test testGitPush\""
+        // Check the commit is added locally
+        gitLog baseDir
+        |> should equal (Some "File added by test testGitPush\nfirst commit in remote")
+
+        // push to remote
+        gitPushIfAheadInDir baseDir
+
+        // Check commit was pushed to the remote
+        gitLog remoteDir
+        |> should equal (Some "File added by test testGitPush\nfirst commit in remote")
     }

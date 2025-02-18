@@ -22,32 +22,41 @@ module ChecksumsCollector =
 
     let gitMutex = new System.Threading.Mutex()
 
-    let gitCommit (subject: string) =
+    let gitCommitInDir (workDir: string) (subject: string) =
 
         gitMutex.WaitOne() |> ignore
 
         cli {
             Exec "git"
             Arguments [ "commit"; "-m"; subject ]
-            WorkingDirectory(baseDir)
+            WorkingDirectory(workDir)
         }
         |> Command.execute
+        |> (fun o ->
+            printfn "%s" (Output.toText o)
+            o)
         |> Output.throwIfErrored
         |> ignore
 
         gitMutex.ReleaseMutex()
         ()
 
-    let gitPushIfAhead () =
+    let gitCommit subject = gitCommitInDir baseDir subject
+
+    let gitPushIfAheadInDir (workDir: string) =
 
         gitMutex.WaitOne() |> ignore
 
+        // Attention: this fails if the remote has no commit yet
         let aheadCount =
             cli {
                 Exec "git"
                 Arguments [ "rev-list"; "--count"; "origin/master..master" ]
-                WorkingDirectory(baseDir)
+                WorkingDirectory(workDir)
             }
+            |> (fun c ->
+                printfn "Executing: %s" (Command.toString c)
+                c)
             |> Command.execute
             |> Output.throwIfErrored
             |> Output.toText
@@ -57,8 +66,11 @@ module ChecksumsCollector =
             cli {
                 Exec "git"
                 Arguments [ "push" ]
-                WorkingDirectory(baseDir)
+                WorkingDirectory(workDir)
             }
+            |> (fun c ->
+                printfn "Executing: %s" (Command.toString c)
+                c)
             |> Command.execute
             |> Output.throwIfErrored
             |> (fun o -> printfn "PUSH: %s" (o |> Output.toText))
@@ -66,6 +78,8 @@ module ChecksumsCollector =
 
         gitMutex.ReleaseMutex()
         ()
+
+    let gitPushIfAhead () = gitPushIfAheadInDir baseDir
 
     let gitAdd (baseDir: string) (path: string) =
         gitMutex.WaitOne() |> ignore
