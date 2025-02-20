@@ -20,52 +20,79 @@ module ChecksumsCollector =
     let CHECKSUMS = ChecksumHelpers.CHECKSUMS
     let baseDir = Environment.GetEnvironmentVariable "BASE_DIR"
 
+    let gitPushCoallescingMinutes =
+        Environment.GetEnvironmentVariable "GIT_PUSH_COALLESCING_MINUTES"
+        |> float
+        |> TimeSpan.FromMinutes
+
     let gitMutex = new System.Threading.Mutex()
 
-    let gitCommit (subject: string) =
+    let gitCommitInDir (workDir: string) (subject: string) =
 
         gitMutex.WaitOne() |> ignore
 
         cli {
             Exec "git"
             Arguments [ "commit"; "-m"; subject ]
-            WorkingDirectory(baseDir)
+            WorkingDirectory(workDir)
         }
         |> Command.execute
+        |> (fun o ->
+            printfn "%s" (Output.toText o)
+            o)
         |> Output.throwIfErrored
         |> ignore
 
         gitMutex.ReleaseMutex()
         ()
 
+    let gitCommit subject = gitCommitInDir baseDir subject
+
+    let mutable lastPushTime: DateTimeOffset option = None
+
+    let gitPushIfAheadInDir (workDir: string) (coallesceTime: TimeSpan) =
+        match lastPushTime with
+        | Some dt when (DateTimeOffset.Now.Subtract(dt).TotalSeconds < coallesceTime.TotalSeconds) ->
+            printfn "Not pushing as coallescing time not reached: %A" (dt.Subtract(DateTime.Now).TotalSeconds)
+
+            ()
+        | _ ->
+            gitMutex.WaitOne() |> ignore
+            // Attention: this fails if the remote has no commit yet
+            let aheadCount =
+                cli {
+                    Exec "git"
+                    Arguments [ "rev-list"; "--count"; "origin/master..master" ]
+                    WorkingDirectory(workDir)
+                }
+                |> (fun c ->
+                    printfn "Executing: %s" (Command.toString c)
+                    c)
+                |> Command.execute
+                |> Output.throwIfErrored
+                |> Output.toText
+                |> int
+
+            if aheadCount > 0 then
+                cli {
+                    Exec "git"
+                    Arguments [ "push" ]
+                    WorkingDirectory(workDir)
+                }
+                |> (fun c ->
+                    printfn "Executing: %s" (Command.toString c)
+                    c)
+                |> Command.execute
+                |> Output.throwIfErrored
+                |> (fun o -> printfn "PUSH: %s" (o |> Output.toText))
+
+
+            lastPushTime <- Some DateTimeOffset.Now
+            gitMutex.ReleaseMutex()
+            ()
+
     let gitPushIfAhead () =
-
-        gitMutex.WaitOne() |> ignore
-
-        let aheadCount =
-            cli {
-                Exec "git"
-                Arguments [ "rev-list"; "--count"; "origin/master..master" ]
-                WorkingDirectory(baseDir)
-            }
-            |> Command.execute
-            |> Output.throwIfErrored
-            |> Output.toText
-            |> int
-
-        if aheadCount > 0 then
-            cli {
-                Exec "git"
-                Arguments [ "push" ]
-                WorkingDirectory(baseDir)
-            }
-            |> Command.execute
-            |> Output.throwIfErrored
-            |> (fun o -> printfn "PUSH: %s" (o |> Output.toText))
-
-
-        gitMutex.ReleaseMutex()
-        ()
+        gitPushIfAheadInDir baseDir gitPushCoallescingMinutes
 
     let gitAdd (baseDir: string) (path: string) =
         gitMutex.WaitOne() |> ignore
