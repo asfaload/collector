@@ -31,19 +31,25 @@ module ChecksumsCollector =
 
         gitMutex.WaitOne() |> ignore
 
-        cli {
-            Exec "git"
-            Arguments [ "commit"; "-m"; subject ]
-            WorkingDirectory(workDir)
-        }
-        |> Command.execute
-        |> (fun o ->
-            printfn "%s" (Output.toText o)
-            o)
-        |> Output.throwIfErrored
-        |> ignore
+        try
+            try
+                cli {
+                    Exec "git"
+                    Arguments [ "commit"; "-m"; subject ]
+                    WorkingDirectory(workDir)
+                }
+                |> Command.execute
+                |> (fun o ->
+                    printfn "%s" (Output.toText o)
+                    o)
+                |> Output.throwIfErrored
+                |> ignore
+            with e ->
+                printfn "caught Exception in gitCommintInDir: %A" e
+                raise e
+        finally
+            gitMutex.ReleaseMutex()
 
-        gitMutex.ReleaseMutex()
         ()
 
     let gitCommit subject = gitCommitInDir baseDir subject
@@ -58,56 +64,72 @@ module ChecksumsCollector =
             ()
         | _ ->
             gitMutex.WaitOne() |> ignore
-            // Attention: this fails if the remote has no commit yet
-            let aheadCount =
-                cli {
-                    Exec "git"
-                    Arguments [ "rev-list"; "--count"; "origin/master..master" ]
-                    WorkingDirectory(workDir)
-                }
-                |> (fun c ->
-                    printfn "Executing: %s" (Command.toString c)
-                    c)
-                |> Command.execute
-                |> Output.throwIfErrored
-                |> Output.toText
-                |> int
+            printfn "gitPushIfAheadInDir acquired mutex"
 
-            if aheadCount > 0 then
-                cli {
-                    Exec "git"
-                    Arguments [ "push" ]
-                    WorkingDirectory(workDir)
-                }
-                |> (fun c ->
-                    printfn "Executing: %s" (Command.toString c)
-                    c)
-                |> Command.execute
-                |> Output.throwIfErrored
-                |> (fun o -> printfn "PUSH: %s" (o |> Output.toText))
+            try
+                try
+                    // Attention: this fails if the remote has no commit yet
+                    let aheadCount =
+                        cli {
+                            Exec "git"
+                            Arguments [ "rev-list"; "--count"; "origin/master..master" ]
+                            WorkingDirectory(workDir)
+                        }
+                        |> (fun c ->
+                            printfn "Executing: %s" (Command.toString c)
+                            c)
+                        |> Command.execute
+                        |> Output.throwIfErrored
+                        |> Output.toText
+                        |> int
+
+                    if aheadCount > 0 then
+                        cli {
+                            Exec "git"
+                            Arguments [ "push" ]
+                            WorkingDirectory(workDir)
+                        }
+                        |> (fun c ->
+                            printfn "Executing: %s" (Command.toString c)
+                            c)
+                        |> Command.execute
+                        |> Output.throwIfErrored
+                        |> (fun o -> printfn "PUSH: %s" (o |> Output.toText))
 
 
-            lastPushTime <- Some DateTimeOffset.Now
-            gitMutex.ReleaseMutex()
+                    lastPushTime <- Some DateTimeOffset.Now
+                with e ->
+                    printfn "caught Exception in gitCommintInDir: %A" e
+                    raise e
+            finally
+                gitMutex.ReleaseMutex()
+
             ()
 
     let gitPushIfAhead () =
+        printfn "calling gitPushIfAhead"
         gitPushIfAheadInDir baseDir gitPushCoallescingMinutes
 
     let gitAdd (baseDir: string) (path: string) =
         gitMutex.WaitOne() |> ignore
         printfn "running git add %s" path
 
-        cli {
-            Exec "git"
-            Arguments [ "add"; path ]
-            WorkingDirectory(baseDir)
-        }
-        |> Command.execute
-        |> Output.throwIfErrored
-        |> ignore
+        try
+            try
+                cli {
+                    Exec "git"
+                    Arguments [ "add"; path ]
+                    WorkingDirectory(baseDir)
+                }
+                |> Command.execute
+                |> Output.throwIfErrored
+                |> ignore
+            with e ->
+                printfn "caught Exception in gitCommintInDir: %A" e
+                raise e
+        finally
+            gitMutex.ReleaseMutex()
 
-        gitMutex.ReleaseMutex()
         path
 
     // Returns Some only if the directory was created.
