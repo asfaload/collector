@@ -59,7 +59,10 @@ module ChecksumsCollector =
     let gitPushIfAheadInDir (workDir: string) (coallesceTime: TimeSpan) =
         match lastPushTime with
         | Some dt when (DateTimeOffset.Now.Subtract(dt).TotalSeconds < coallesceTime.TotalSeconds) ->
-            printfn "Not pushing as coallescing time not reached: %A" (dt.Subtract(DateTime.Now).TotalSeconds)
+            printfn
+                "Not pushing as coallescing time not reached since last push: %f s < %f s"
+                ((DateTimeOffset.Now).Subtract(dt).TotalSeconds)
+                coallesceTime.TotalSeconds
 
             ()
         | _ ->
@@ -96,8 +99,9 @@ module ChecksumsCollector =
                         |> Output.throwIfErrored
                         |> (fun o -> printfn "PUSH: %s" (o |> Output.toText))
 
+                        lastPushTime <- Some DateTimeOffset.Now
 
-                    lastPushTime <- Some DateTimeOffset.Now
+
                 with e ->
                     printfn "caught Exception in gitCommintInDir: %A" e
                     raise e

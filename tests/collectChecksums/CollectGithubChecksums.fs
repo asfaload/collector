@@ -380,3 +380,75 @@ let testGitCoallescedPush () =
             equal
             (Some "Second file added by test testGitPush\nFile added by test testGitPush\nfirst commit in remote")
     }
+
+[<Test>]
+let testGitCoallescedEffectivePush () =
+    // Check that a call to gitPush which didn't push anything is not considered for resetting the coallescing time
+    async {
+        let remoteDir, baseDir = initialiseRemoteAndLocalClone ()
+        // Add another file
+        let addedFilePath = Path.Combine(baseDir, "addedFile")
+        File.WriteAllText(addedFilePath, "This file was added to the git repo after the clone")
+        gitAdd baseDir addedFilePath |> should equal addedFilePath
+        gitCommitInDir baseDir "\"File added by test testGitPush\""
+        // Check the commit is added locally
+        gitLog baseDir
+        |> should equal (Some "File added by test testGitPush\nfirst commit in remote")
+
+        let effectivePushTime = DateTimeOffset.Now
+        // push to remote
+        gitPushIfAheadInDir baseDir (TimeSpan.FromMinutes 5)
+        // Check commit was pushed to the remote
+        gitLog remoteDir
+        |> should equal (Some "File added by test testGitPush\nfirst commit in remote")
+
+
+        // Wait to be sure the empty push is uncoallesced and takes place
+        do! Async.Sleep 10
+        let emptyGitPushAt = DateTimeOffset.Now
+        // Do the empty push
+        gitPushIfAheadInDir baseDir (TimeSpan.FromMicroseconds 1)
+
+        // Add another file locally
+        let addedFilePath = Path.Combine(baseDir, "secondAddedFile")
+        File.WriteAllText(addedFilePath, "This file was added as second to the repo")
+        gitAdd baseDir addedFilePath |> should equal addedFilePath
+        gitCommitInDir baseDir "\"Second file added by test testGitPush\""
+
+        gitLog baseDir
+        |> should
+            equal
+            (Some "Second file added by test testGitPush\nFile added by test testGitPush\nfirst commit in remote")
+
+        // Sleep 100 ms so we can measure a reasonable timespan from the empty push
+        do! Async.Sleep 100
+        // Get time ellapsed from empty push, which we will use as coallescing time
+        let timeFromEmptyPush =
+            DateTimeOffset.Now.Subtract(emptyGitPushAt).TotalMilliseconds
+
+        let timeFromEffectivePush =
+            DateTimeOffset.Now.Subtract(effectivePushTime).TotalMilliseconds
+        // Use the measured timeFromEmptyPush + 10ms as coallescing time.
+        let coallescingTime = timeFromEmptyPush + 20.0
+        // Leave these prints to give good information if the test fails
+        printfn "Using coallessing time: %f" coallescingTime
+        printfn "Time from effective push: %f" timeFromEffectivePush
+        printfn "Time from empty push: %f" timeFromEmptyPush
+
+        printfn
+            "For the test to be relevant, we expect the time reached from the previous push,\nas reported by the gitPushIfAhead function to be between %f  and %f"
+            timeFromEmptyPush
+            coallescingTime
+
+        // Validate the time values are as expected for the test to be relevant
+        timeFromEffectivePush > coallescingTime |> should equal true
+        timeFromEmptyPush < coallescingTime |> should equal true
+
+        // push to remote, but too rapidly after empty push, but ok since effective push
+        gitPushIfAheadInDir baseDir (TimeSpan.FromMilliseconds coallescingTime)
+
+        gitLog remoteDir
+        |> should
+            equal
+            (Some "Second file added by test testGitPush\nFile added by test testGitPush\nfirst commit in remote")
+    }
