@@ -8,11 +8,11 @@ module Ignore =
         System.Environment.GetEnvironmentVariable("GITHUB_IGNORE_FILE") |> Option.ofObj
 
     // keep last time the github ignore file was processed
-    let mutable githubIgnoreUpdatedAt: DateTimeOffset option = None
+    let mutable githubIgnoreUpdatedAt: DateTime option = None
 
     let processGithubIgnoreFile (ignoreFile: string option) =
         printfn "Loading github ignore file %A" ignoreFile
-        githubIgnoreUpdatedAt <- Some <| DateTimeOffset.Now
+        githubIgnoreUpdatedAt <- githubIgnoreFile |> Option.map (fun p -> FileInfo(p).LastWriteTimeUtc)
 
         ignoreFile
         |> Option.bind (fun path ->
@@ -39,7 +39,22 @@ module Ignore =
 
 
     // Functions used in prod
-    let githubIgnored = processGithubIgnoreFile githubIgnoreFile
+    //
+    // Initialised to None as it is updated when used
+    let mutable githubIgnored = None
 
     let isGithubIgnored user repo =
+        // Load/reload ignore file if needed
+        githubIgnoreFile
+        |> Option.map FileInfo
+        |> Option.iter (fun info ->
+            match githubIgnoreUpdatedAt with
+            | None ->
+                printfn "First loading of github ignore file"
+                githubIgnored <- processGithubIgnoreFile githubIgnoreFile
+            | Some dt ->
+                if info.LastWriteTimeUtc > dt then
+                    printfn "reloading github ignore file"
+                    githubIgnored <- processGithubIgnoreFile githubIgnoreFile)
+
         isIgnored githubIgnored $"{user}/{repo}"

@@ -104,7 +104,6 @@ let test_ignoreFromFile () =
     let ignoreFilePath = System.IO.Path.GetTempFileName()
     let ignoredPatterns = [| "asfa.*/.*"; ".*/bibol"; "evilCorp/.*"; "zz" |]
     File.WriteAllLines(ignoreFilePath, ignoredPatterns)
-    File.AppendAllLines(ignoreFilePath, ignoredPatterns)
 
     let githubIgnore = processGithubIgnoreFile (Some ignoreFilePath)
     validateProcessedGithubIgnore githubIgnore
@@ -113,3 +112,33 @@ let test_ignoreFromFile () =
         processGithubIgnoreFile (Some "fixtures/sampleGithubIgnore.txt")
 
     validateProcessedGithubIgnore githubIgnoreFromFile
+
+[<Test>]
+let test_ignoreFileReload () =
+    let ignoreFilePath = System.IO.Path.GetTempFileName()
+    let ignoredPatterns = [| "asfa.*/.*" |]
+    File.AppendAllLines(ignoreFilePath, ignoredPatterns)
+    let githubIgnore = processGithubIgnoreFile (Some ignoreFilePath)
+    isIgnored githubIgnore "asfaload/checksums" |> should equal true
+    isIgnored githubIgnore "astalock/bibol" |> should equal false
+    isIgnored githubIgnore "evilCorp/welcome" |> should equal false
+    isIgnored githubIgnore "zzevilcorp/welcome" |> should equal false
+    isIgnored githubIgnore "evilcorp/welcome" |> should equal false
+    File.AppendAllLines(ignoreFilePath, [| ".*/bibol" |])
+    isIgnored githubIgnore "asfaload/checksums" |> should equal true
+    isIgnored githubIgnore "astalock/bibol" |> should equal true
+    isIgnored githubIgnore "evilCorp/welcome" |> should equal false
+    isIgnored githubIgnore "zzevilcorp/welcome" |> should equal false
+    isIgnored githubIgnore "evilcorp/welcome" |> should equal false
+    File.AppendAllLines(ignoreFilePath, [| "evilCorp/.*" |])
+    isIgnored githubIgnore "asfaload/checksums" |> should equal true
+    isIgnored githubIgnore "astalock/bibol" |> should equal true
+    isIgnored githubIgnore "evilCorp/welcome" |> should equal true
+    isIgnored githubIgnore "zzevilcorp/welcome" |> should equal false
+    isIgnored githubIgnore "evilcorp/welcome" |> should equal false
+    File.AppendAllLines(ignoreFilePath, [| "zz" |])
+    isIgnored githubIgnore "asfaload/checksums" |> should equal true
+    isIgnored githubIgnore "astalock/bibol" |> should equal true
+    isIgnored githubIgnore "evilCorp/welcome" |> should equal true
+    isIgnored githubIgnore "zzevilcorp/welcome" |> should equal true
+    isIgnored githubIgnore "evilcorp/welcome" |> should equal false
