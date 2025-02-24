@@ -20,6 +20,12 @@ module ChecksumsCollector =
     let CHECKSUMS = ChecksumHelpers.CHECKSUMS
     let baseDir = Environment.GetEnvironmentVariable "BASE_DIR"
 
+    let checksumLongSleep =
+        Environment.GetEnvironmentVariable "CHECKSUM_LONG_SLEEP_SECONDS"
+        |> Option.ofObj
+        |> Option.map int
+        |> Option.defaultValue 60
+
     let gitPushCoallescingMinutes =
         Environment.GetEnvironmentVariable "GIT_PUSH_COALLESCING_MINUTES"
         |> float
@@ -329,10 +335,8 @@ module ChecksumsCollector =
     let updateChecksumsNames (assets: string seq) (repo: Repo) =
         async {
 
-            if (isNull (Environment.GetEnvironmentVariable("DEBUG"))) then
-                do! Async.Sleep 60_000
-
-
+            printfn "Long sleep"
+            do! Async.Sleep(checksumLongSleep * 1000)
 
             let checksumsFiles = assets |> ChecksumHelpers.filterChecksums
 
@@ -344,8 +348,8 @@ module ChecksumsCollector =
     let updateChecksumsNamesFromReleaseId user (repo: Repo) releaseId =
         async {
 
-            if (isNull (Environment.GetEnvironmentVariable("DEBUG"))) then
-                do! Async.Sleep 60_000
+            printfn "Long sleep"
+            do! Async.Sleep(checksumLongSleep * 1000)
 
             let! response =
                 http {
