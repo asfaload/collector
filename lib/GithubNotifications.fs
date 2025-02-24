@@ -69,7 +69,7 @@ let markNotificationsReadUntil (lastModified: DateTimeOffset) =
             }
             |> Request.sendAsync
 
-        printfn "Mark as read response code %A %A" response.statusCode (response.ToText())
+        printfn "Mark as read response code %A" response.statusCode
 
     }
 
