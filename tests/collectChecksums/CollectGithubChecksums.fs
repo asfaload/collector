@@ -350,7 +350,7 @@ let testGitCoallescedPush () =
         |> should equal (Some "File added by test testGitPush\nfirst commit in remote")
 
         // push to remote
-        gitPushIfAheadInDir baseDir (TimeSpan.FromMinutes 5)
+        gitPushIfAheadInDir baseDir (TimeSpan.FromMicroseconds 5)
         // Check commit was pushed to the remote
         gitLog remoteDir
         |> should equal (Some "File added by test testGitPush\nfirst commit in remote")
@@ -385,6 +385,7 @@ let testGitCoallescedPush () =
 let testGitCoallescedEffectivePush () =
     // Check that a call to gitPush which didn't push anything is not considered for resetting the coallescing time
     async {
+        let testStartTime = DateTimeOffset.Now
         let remoteDir, baseDir = initialiseRemoteAndLocalClone ()
         // Add another file
         let addedFilePath = Path.Combine(baseDir, "addedFile")
@@ -398,6 +399,10 @@ let testGitCoallescedEffectivePush () =
         let effectivePushTime = DateTimeOffset.Now
         // push to remote
         gitPushIfAheadInDir baseDir (TimeSpan.FromMinutes 5)
+
+        printfn
+            "after push, recorded pushtime is %A"
+            ((Asfaload.Collector.ChecksumsCollector.lastPushTime |> Option.get).Subtract(testStartTime))
         // Check commit was pushed to the remote
         gitLog remoteDir
         |> should equal (Some "File added by test testGitPush\nfirst commit in remote")
@@ -408,6 +413,10 @@ let testGitCoallescedEffectivePush () =
         let emptyGitPushAt = DateTimeOffset.Now
         // Do the empty push
         gitPushIfAheadInDir baseDir (TimeSpan.FromMicroseconds 1)
+
+        printfn
+            "after push not done, recorded pushtime is %A"
+            ((Asfaload.Collector.ChecksumsCollector.lastPushTime |> Option.get).Subtract(testStartTime))
 
         // Add another file locally
         let addedFilePath = Path.Combine(baseDir, "secondAddedFile")
@@ -420,32 +429,38 @@ let testGitCoallescedEffectivePush () =
             equal
             (Some "Second file added by test testGitPush\nFile added by test testGitPush\nfirst commit in remote")
 
-        // Sleep 100 ms so we can measure a reasonable timespan from the empty push
-        do! Async.Sleep 100
         // Get time ellapsed from empty push, which we will use as coallescing time
         let timeFromEmptyPush =
             DateTimeOffset.Now.Subtract(emptyGitPushAt).TotalMilliseconds
 
-        let timeFromEffectivePush =
-            DateTimeOffset.Now.Subtract(effectivePushTime).TotalMilliseconds
         // Use the measured timeFromEmptyPush + 10ms as coallescing time.
         let coallescingTime = timeFromEmptyPush + 20.0
+        // Sleep 100 ms so we will be well above (80ms) above the coallescing time
+        do! Async.Sleep 100
         // Leave these prints to give good information if the test fails
         printfn "Using coallessing time: %f" coallescingTime
-        printfn "Time from effective push: %f" timeFromEffectivePush
-        printfn "Time from empty push: %f" timeFromEmptyPush
 
         printfn
-            "For the test to be relevant, we expect the time reached from the previous push,\nas reported by the gitPushIfAhead function to be between %f  and %f"
-            timeFromEmptyPush
-            coallescingTime
+            "Time from effective push as stored by app code: %A"
+            (DateTimeOffset.Now
+                .Subtract(Asfaload.Collector.ChecksumsCollector.lastPushTime |> Option.get)
+                .TotalMilliseconds)
+
+        printfn "Time from empty push: %f" timeFromEmptyPush
 
         // Validate the time values are as expected for the test to be relevant
-        timeFromEffectivePush > coallescingTime |> should equal true
+        // timeFromEffectivePush  > coallescing time
+        (DateTimeOffset.Now.Subtract(Asfaload.Collector.ChecksumsCollector.lastPushTime |> Option.get).TotalMilliseconds) > coallescingTime
+        |> should equal true
+
         timeFromEmptyPush < coallescingTime |> should equal true
 
         // push to remote, but too rapidly after empty push, but ok since effective push
         gitPushIfAheadInDir baseDir (TimeSpan.FromMilliseconds coallescingTime)
+
+        printfn
+            "after push, recorded pushtime is %A"
+            ((Asfaload.Collector.ChecksumsCollector.lastPushTime |> Option.get).Subtract(testStartTime))
 
         gitLog remoteDir
         |> should
