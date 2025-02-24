@@ -87,6 +87,16 @@ let test_isIgnored () =
 [<Test>]
 let test_ignoreFromFile () =
 
+    let validateProcessedGithubIgnore githubIgnore =
+        isIgnored githubIgnore "asfaload/checksums" |> should equal true
+        isIgnored githubIgnore "astalock/checksums" |> should equal false
+        isIgnored githubIgnore "astalock/bibol" |> should equal true
+        isIgnored githubIgnore "evilCorp/welcome" |> should equal true
+        isIgnored githubIgnore "evilcorp/welcome" |> should equal false
+        isIgnored githubIgnore "zzevilcorp/welcome" |> should equal true
+        isIgnored githubIgnore "evilcorpzz/welcome" |> should equal true
+        isIgnored githubIgnore "evilcorp/zzwelcome" |> should equal true
+        isIgnored githubIgnore "evilcorp/welcomezz" |> should equal true
 
     let githubIgnore = processGithubIgnoreFile (Some "/tmp/inexisting/file/ignore.txt")
     isIgnored githubIgnore "asfaload/checksums" |> should equal false
@@ -97,12 +107,9 @@ let test_ignoreFromFile () =
     File.AppendAllLines(ignoreFilePath, ignoredPatterns)
 
     let githubIgnore = processGithubIgnoreFile (Some ignoreFilePath)
-    isIgnored githubIgnore "asfaload/checksums" |> should equal true
-    isIgnored githubIgnore "astalock/checksums" |> should equal false
-    isIgnored githubIgnore "astalock/bibol" |> should equal true
-    isIgnored githubIgnore "evilCorp/welcome" |> should equal true
-    isIgnored githubIgnore "evilcorp/welcome" |> should equal false
-    isIgnored githubIgnore "zzevilcorp/welcome" |> should equal true
-    isIgnored githubIgnore "evilcorpzz/welcome" |> should equal true
-    isIgnored githubIgnore "evilcorp/zzwelcome" |> should equal true
-    isIgnored githubIgnore "evilcorp/welcomezz" |> should equal true
+    validateProcessedGithubIgnore githubIgnore
+
+    let githubIgnoreFromFile =
+        processGithubIgnoreFile (Some "fixtures/sampleGithubIgnore.txt")
+
+    validateProcessedGithubIgnore githubIgnoreFromFile

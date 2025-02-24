@@ -1,0 +1,4 @@
+asfa.*/.*
+.*/bibol
+evilCorp/.*
+zz
