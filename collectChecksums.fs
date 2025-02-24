@@ -7,6 +7,7 @@
 
 open Asfaload.Collector.ChecksumsCollector
 open Asfaload.Collector
+open Asfaload.Collector.Ignore
 
 
 let rec readQueue () =
@@ -22,8 +23,12 @@ let rec readQueue () =
 
         do!
             Queue.consumeRepoReleases (fun repo ->
-                printfn "repo = %A" repo
-                handleRepoRelease repo |> Async.RunSynchronously)
+                printfn "user = %s , repo = %s" repo.user repo.repo
+
+                if isGithubIgnored repo.user repo.repo then
+                    printfn "Not collecting checksums of ignored repo %s/%s" repo.user repo.repo
+                else
+                    handleRepoRelease repo |> Async.RunSynchronously)
             |> Async.AwaitTask
 
         gitPushIfAhead ()
