@@ -1,0 +1,3 @@
+WARNING: the message logged is erroneous!
+A repo ignored is logged as not ignored, and and repo not ignored is reported
+as ignored. Yes, I know....
