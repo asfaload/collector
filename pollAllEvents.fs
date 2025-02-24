@@ -6,6 +6,7 @@
 // count regarding the requests quota.
 
 open Asfaload.Collector.DB
+open Asfaload.Collector.Ignore
 open Asfaload.Collector.ChecksumHelpers
 open PollAll
 open FsHttp
@@ -27,8 +28,11 @@ let githubEventHandler (targetNumber: int) (el: System.Text.Json.JsonElement) =
                 let user, gitRepo = fullRepoName.Split("/") |> (fun a -> a[0], a[1])
                 let! count = Repos.isKnown user gitRepo |> Sqlite.run
                 let seen = count <> 0
+                let ignored = isGithubIgnored user gitRepo
 
-                if not seen && not (fullRepoName.EndsWith("/neovim")) then
+                if ignored then
+                    printfn "ignore %s/%s repo" user gitRepo
+                else if not seen then
                     printfn "**NEW**"
                     countNewRepos <- countNewRepos + 1
                     do! Repos.seen user gitRepo |> Sqlite.run

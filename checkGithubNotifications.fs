@@ -8,6 +8,8 @@
 // collect the checksums of the release.
 
 open Asfaload.Collector
+open Asfaload.Collector.DB
+open Asfaload.Collector.Ignore
 open GithubNotifications
 open FsHttp
 
@@ -21,14 +23,17 @@ let releasesHandler (json: System.Text.Json.JsonElement) =
             let user = (release?repository?owner?login.ToString())
             let repo = (release?repository?name.ToString())
 
-            let repo =
-                { user = user
-                  repo = repo
-                  kind = Github
-                  checksums = [] }
+            let isIgnored = isGithubIgnored user repo
 
-            printfn "registering release %A://%s/%s" repo.kind repo.user repo.repo
-            do! Queue.publishRepoRelease repo
+            if not <| isIgnored then
+                let repo =
+                    { user = user
+                      repo = repo
+                      kind = Github
+                      checksums = [] }
+
+                printfn "registering release %A://%s/%s" repo.kind repo.user repo.repo
+                do! Queue.publishRepoRelease repo
     }
 
 loop releasesHandler
