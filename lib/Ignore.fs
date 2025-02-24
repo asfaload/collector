@@ -11,6 +11,7 @@ module Ignore =
     let mutable githubIgnoreUpdatedAt: DateTimeOffset option = None
 
     let processGithubIgnoreFile (ignoreFile: string option) =
+        printfn "Loading github ignore file %A" ignoreFile
         githubIgnoreUpdatedAt <- Some <| DateTimeOffset.Now
 
         ignoreFile
@@ -23,13 +24,23 @@ module Ignore =
 
 
     let isIgnored (blockSeq: string seq option) (value: string) =
-        blockSeq
-        |> Option.bind (fun s ->
-            s
-            |> Seq.map (fun s -> System.Text.RegularExpressions.Regex(s))
-            |> Seq.map (fun regex -> regex.Match(value).Success)
-            |> Seq.tryFind id)
-        |> Option.defaultValue false
+        printfn "Evaluating if %s is ignored" value
+
+        let r =
+            blockSeq
+            |> Option.bind (fun s ->
+                s
+                |> Seq.map (fun s -> System.Text.RegularExpressions.Regex(s))
+                |> Seq.map (fun regex -> regex.Match(value).Success)
+                |> Seq.tryFind id)
+            |> Option.defaultValue false
+
+        if r then
+            printfn "%s is not ignored" value
+        else
+            printfn "%s is ignored" value
+
+        r
 
     // Functions used in prod
     let githubIgnored = processGithubIgnoreFile githubIgnoreFile
