@@ -26,21 +26,17 @@ module Ignore =
     let isIgnored (blockSeq: string seq option) (value: string) =
         printfn "Evaluating if %s is ignored" value
 
-        let r =
-            blockSeq
-            |> Option.bind (fun s ->
-                s
-                |> Seq.map (fun s -> System.Text.RegularExpressions.Regex(s))
-                |> Seq.map (fun regex -> regex.Match(value).Success)
-                |> Seq.tryFind id)
-            |> Option.defaultValue false
+        blockSeq
+        |> Option.bind (fun s ->
+            s
+            |> Seq.map (fun s -> s, System.Text.RegularExpressions.Regex(s))
+            |> Seq.map (fun (s, regex) -> s, regex.Match(value).Success)
+            |> Seq.tryFind (fun (_s, b) -> b)
+            |> Option.map (fun (s, b) ->
+                printfn "%s isgnored as it matches regexp `%s`" value s
+                b))
+        |> Option.defaultValue false
 
-        if r then
-            printfn "%s is not ignored" value
-        else
-            printfn "%s is ignored" value
-
-        r
 
     // Functions used in prod
     let githubIgnored = processGithubIgnoreFile githubIgnoreFile
