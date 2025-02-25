@@ -118,7 +118,7 @@ module Queue =
             let! consumer = stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("releases_processor"))
 
             do!
-                consumer.FetchAsync<string>(opts = new NatsJSFetchOpts(MaxMsgs = 1))
+                consumer.FetchAsync<string>(opts = new NatsJSFetchOpts(MaxMsgs = 1, Expires = TimeSpan.FromSeconds(1)))
                 |> TaskSeq.iter (fun jmsg ->
                     try
                         f (jmsg.Data |> JsonSerializer.Deserialize<Repo>)
@@ -140,7 +140,7 @@ module Queue =
             let! consumer = stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("releases_callback_processor"))
 
             do!
-                consumer.FetchAsync<string>(opts = new NatsJSFetchOpts(MaxMsgs = 1))
+                consumer.FetchAsync<string>(opts = new NatsJSFetchOpts(MaxMsgs = 1, Expires = TimeSpan.FromSeconds(1)))
                 |> TaskSeq.iter (fun jmsg ->
                     f (jmsg.Data |> ReleaseCallbackBody.Parse)
                     jmsg.AckAsync().AsTask() |> Async.AwaitTask |> Async.RunSynchronously)
