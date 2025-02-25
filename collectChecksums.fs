@@ -13,17 +13,13 @@ open Asfaload.Collector.Ignore
 let rec readQueue () =
     async {
 
-        let mutable handledRepo = false
+        printfn "Start of readQueue"
 
         do!
             Queue.consumeCallbackRelease (fun callbackBody ->
-                handledRepo <- true
                 printfn "running callbackRelease %s" (callbackBody.Repository.FullName)
                 handleCallbackRelease callbackBody |> Async.RunSynchronously)
             |> Async.AwaitTask
-
-        if handledRepo then
-            do! Async.Sleep 1000
 
         do!
             Queue.consumeRepoReleases (fun repo ->
@@ -32,16 +28,10 @@ let rec readQueue () =
                 if isGithubIgnored repo.user repo.repo then
                     printfn "Not collecting checksums of ignored repo %s/%s" repo.user repo.repo
                 else
-                    handledRepo <- true
                     handleRepoRelease repo |> Async.RunSynchronously)
             |> Async.AwaitTask
 
         gitPushIfAhead ()
-        printfn "Fetching release consumed 1 or timed out, will sleep 5s"
-
-        if handledRepo then
-            printfn "sleep 5s as handled repo"
-            do! Async.Sleep 5000
 
         return! readQueue ()
 
