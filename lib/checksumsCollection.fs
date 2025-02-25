@@ -304,39 +304,46 @@ module ChecksumsCollector =
             let downloadSegments =
                 lastUri.Segments |> Array.map (fun s -> if s = "tag/" then "download/" else s)
 
-            let checksumsAsyncs =
-                r.checksums
-                |> List.map (fun name ->
-                    async {
-                        do! Async.Sleep 1000
-                        return! downloadIndividualChecksumsFile baseDir lastUri downloadSegments name
-                    })
-
             let relativeDownloadDir = getDownloadDir lastUri.Host downloadSegments
-
             let downloadDir = Path.Combine(baseDir, relativeDownloadDir)
 
+            // Check if the download directory already exists. If that's the case, it means
+            // we look at a release we have already handled in the past, so we immediately return
+            // an empty array, signaling no checksum was downloaded
+            if Directory.Exists downloadDir then
+                printfn "download dir %s exists, we already have downloaded thes checksums" downloadDir
+                return [||]
+            else
+                let checksumsAsyncs =
+                    r.checksums
+                    |> List.map (fun name ->
+                        async {
+                            do! Async.Sleep 1000
+                            return! downloadIndividualChecksumsFile baseDir lastUri downloadSegments name
+                        })
 
-            let generateIndexAsync =
-                async {
-                    if Directory.Exists downloadDir then
-                        printfn "will generate index for downloadDir %s" downloadDir
 
-                        Index.generateChecksumsList
-                            downloadDir
-                            (toOption releasePublishedAt)
-                            (Some DateTimeOffset.UtcNow)
 
-                        gitAdd baseDir downloadDir |> ignore
-                    else
-                        printfn "not generating index for inexisting directory %s" downloadDir
+                let generateIndexAsync =
+                    async {
+                        if Directory.Exists downloadDir then
+                            printfn "will generate index for downloadDir %s" downloadDir
 
-                    // As we run this async at the same level as the asyncs downloading checksums
-                    // files, we return None here to be sure it is not handled as a checksums file
-                    return None
-                }
+                            Index.generateChecksumsList
+                                downloadDir
+                                (toOption releasePublishedAt)
+                                (Some DateTimeOffset.UtcNow)
 
-            return! List.append checksumsAsyncs [ generateIndexAsync ] |> Async.Sequential
+                            gitAdd baseDir downloadDir |> ignore
+                        else
+                            printfn "not generating index for inexisting directory %s" downloadDir
+
+                        // As we run this async at the same level as the asyncs downloading checksums
+                        // files, we return None here to be sure it is not handled as a checksums file
+                        return None
+                    }
+
+                return! List.append checksumsAsyncs [ generateIndexAsync ] |> Async.Sequential
 
         }
 
