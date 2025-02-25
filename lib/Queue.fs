@@ -117,10 +117,21 @@ module Queue =
             let! stream = getStream "RELEASES" [| "releases.>" |]
             let! consumer = stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("releases_processor"))
 
+            printfn
+                "The release_processor consumer has these info:\ncreated at:%A\nName:%s\nPending msgs: %d"
+                consumer.Info.Created
+                consumer.Info.Name
+                consumer.Info.NumPending
+
             do!
                 consumer.FetchAsync<string>(opts = new NatsJSFetchOpts(MaxMsgs = 1, Expires = TimeSpan.FromSeconds(1)))
                 |> TaskSeq.iter (fun jmsg ->
                     try
+
+                        jmsg.Metadata
+                        |> (fun d -> if d.HasValue then Some d.Value else None)
+                        |> Option.iter (fun md -> printfn "Retrieved message with timestamp %A" md.Timestamp)
+
                         f (jmsg.Data |> JsonSerializer.Deserialize<Repo>)
                         jmsg.AckAsync().AsTask() |> Async.AwaitTask |> Async.RunSynchronously
                     with e ->
@@ -139,9 +150,20 @@ module Queue =
             let! stream = getStream "RELEASES_CALLBACK" [| "releases_callback.>" |]
             let! consumer = stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("releases_callback_processor"))
 
+            printfn
+                "The release_callback_processor consumer has these info:\ncreated at:%A\nName:%s\nPending msgs: %d"
+                consumer.Info.Created
+                consumer.Info.Name
+                consumer.Info.NumPending
+
             do!
                 consumer.FetchAsync<string>(opts = new NatsJSFetchOpts(MaxMsgs = 1, Expires = TimeSpan.FromSeconds(1)))
                 |> TaskSeq.iter (fun jmsg ->
+
+                    jmsg.Metadata
+                    |> (fun d -> if d.HasValue then Some d.Value else None)
+                    |> Option.iter (fun md -> printfn "Retrieved message with timestamp %A" md.Timestamp)
+
                     f (jmsg.Data |> ReleaseCallbackBody.Parse)
                     jmsg.AckAsync().AsTask() |> Async.AwaitTask |> Async.RunSynchronously)
 
