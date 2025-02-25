@@ -37,7 +37,12 @@ module Queue =
 
                 let! s =
                     js.CreateStreamAsync(
-                        new StreamConfig(streamName, subjects = subjects, Retention = StreamConfigRetention.Workqueue)
+                        new StreamConfig(
+                            streamName,
+                            subjects = subjects,
+                            Retention = StreamConfigRetention.Limits,
+                            MaxAge = TimeSpan.FromDays(1)
+                        )
                     )
 
                 cachedStream <- cachedStream.Add(streamName, s)
