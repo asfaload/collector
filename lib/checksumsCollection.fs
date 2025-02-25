@@ -232,11 +232,7 @@ module ChecksumsCollector =
 
 
             match resultingOption with
-            | Some path ->
-                printfn "New checksums file downloaded at %s" path
-                // We only do the long sleep if a download took place
-                printfn "Long sleep"
-                do! Async.Sleep(checksumLongSleep * 1000)
+            | Some path -> printfn "New checksums file downloaded at %s" path
             | None -> printfn "No download took place"
 
             return resultingOption
@@ -314,6 +310,10 @@ module ChecksumsCollector =
                 printfn "download dir %s exists, we already have downloaded thes checksums" downloadDir
                 return [||]
             else
+                // We only do the long sleep if a download will take place
+                printfn "Long sleep"
+                do! Async.Sleep(checksumLongSleep * 1000)
+
                 let checksumsAsyncs =
                     r.checksums
                     |> List.map (fun name ->
