@@ -115,7 +115,11 @@ module Queue =
     let consumeRepoReleases (f: Repo -> unit) =
         task {
             let! stream = getStream "RELEASES" [| "releases.>" |]
-            let! consumer = stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("releases_processor"))
+
+            let! consumer =
+                stream.CreateOrderedConsumerAsync(
+                    new NatsJSOrderedConsumerOpts(OptStartTime = DateTimeOffset.Now.AddDays(-1))
+                )
 
             printfn
                 "The release_processor consumer has these info:\ncreated at:%A\nName:%s\nPending msgs: %d"
@@ -130,7 +134,8 @@ module Queue =
 
                         jmsg.Metadata
                         |> (fun d -> if d.HasValue then Some d.Value else None)
-                        |> Option.iter (fun md -> printfn "Retrieved message with timestamp %A" md.Timestamp)
+                        |> Option.iter (fun md ->
+                            printfn "Retrieved message with timestamp %A and sequence %A" md.Timestamp md.Sequence)
 
                         f (jmsg.Data |> JsonSerializer.Deserialize<Repo>)
                         jmsg.AckAsync().AsTask() |> Async.AwaitTask |> Async.RunSynchronously
@@ -148,7 +153,11 @@ module Queue =
     let consumeCallbackRelease (f: ReleaseCallbackBody.Root -> unit) =
         task {
             let! stream = getStream "RELEASES_CALLBACK" [| "releases_callback.>" |]
-            let! consumer = stream.CreateOrUpdateConsumerAsync(new ConsumerConfig("releases_callback_processor"))
+
+            let! consumer =
+                stream.CreateOrderedConsumerAsync(
+                    new NatsJSOrderedConsumerOpts(OptStartTime = DateTimeOffset.Now.AddDays(-1))
+                )
 
             printfn
                 "The release_callback_processor consumer has these info:\ncreated at:%A\nName:%s\nPending msgs: %d"
