@@ -232,7 +232,11 @@ module ChecksumsCollector =
 
 
             match resultingOption with
-            | Some path -> printfn "New checksums file downloaded at %s" path
+            | Some path ->
+                printfn "New checksums file downloaded at %s" path
+                // We only do the long sleep if a download took place
+                printfn "Long sleep"
+                do! Async.Sleep(checksumLongSleep * 1000)
             | None -> printfn "No download took place"
 
             return resultingOption
@@ -342,11 +346,7 @@ module ChecksumsCollector =
     let updateChecksumsNames (assets: string seq) (repo: Repo) =
         async {
 
-            printfn "Long sleep"
-            do! Async.Sleep(checksumLongSleep * 1000)
-
             let checksumsFiles = assets |> ChecksumHelpers.filterChecksums
-
             printfn "found checksums files %A" checksumsFiles
             return { repo with checksums = checksumsFiles }
 
@@ -354,9 +354,6 @@ module ChecksumsCollector =
 
     let updateChecksumsNamesFromReleaseId user (repo: Repo) releaseId =
         async {
-
-            printfn "Long sleep"
-            do! Async.Sleep(checksumLongSleep * 1000)
 
             let! response =
                 http {
