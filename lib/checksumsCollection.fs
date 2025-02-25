@@ -154,13 +154,20 @@ module ChecksumsCollector =
 
         if Directory.Exists absoluteDirPath then
             // Path exists, return Some to continue processing
+            printfn "%s: exists" absoluteDirPath
             Some absoluteDirPath
         else
             try
                 let dir = Directory.CreateDirectory absoluteDirPath
                 // Return None when directory cannot be created, to stop further processing
-                if dir.Exists then Some absoluteDirPath else None
+                if dir.Exists then
+                    printfn "Directory successfully created"
+                    Some absoluteDirPath
+                else
+                    printfn "Directory could not be created"
+                    None
             with e ->
+                printfn "Problem creating directory!\n%s\n%s\n---\n%A" e.Message e.StackTrace e
                 None
 
     // Returns None if no download took place
