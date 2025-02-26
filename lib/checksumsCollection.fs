@@ -250,18 +250,27 @@ module ChecksumsCollector =
                     |> Async.AwaitTask
 
                 let proper = releases |> Seq.filter (fun r -> not r.Draft && not r.Prerelease)
+                let totalRetrieved = releases |> Seq.length
                 let count = (proper |> Seq.length)
                 printfn "found %d releases " count
 
-                if count = 0 then
+                // If no release was retrieved, stop here
+                if totalRetrieved = 0 then
+                    printfn "No release retrieved"
+                    return None
+                // If we retrieved releases but all were draft or pre-release, look at earlier releases
+                else if count = 0 then
                     if iteration < 10 then
+                        printfn "will look at next page of releases"
                         // Avoid secundary rate limits
                         do! Async.Sleep 1000
                         return! looper (iteration + 1)
                     else
                         printfn "No release found for %s/%s" repo.user repo.repo
                         return None
+                // here we retrieved releases and count>0, meaning we have a release to use
                 else
+                    printfn "Found a release"
                     return (proper |> Seq.head |> Some)
 
             }
