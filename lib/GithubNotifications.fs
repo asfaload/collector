@@ -75,7 +75,7 @@ let markNotificationsReadUntil (lastModified: DateTimeOffset) =
 
 let rec getNotificationsFrom
     (recurse: bool)
-    (httpRequest: IToRequest)
+    (buildHttpRequest: DateTimeOffset option -> IToRequest)
     (markNotificationsAsRead: DateTimeOffset -> Async<unit>)
     (lastModified: DateTimeOffset option)
     (releasesHandler: System.Text.Json.JsonElement -> System.Threading.Tasks.Task<unit>)
@@ -84,7 +84,7 @@ let rec getNotificationsFrom
 
         printfn "Start call at %A" DateTime.Now
 
-        let! response = httpRequest |> Request.sendAsync
+        let! response = buildHttpRequest lastModified |> Request.sendAsync
 
         printfn "response code %A" response.statusCode
         let headers = response.headers
@@ -113,7 +113,9 @@ let rec getNotificationsFrom
             if recurse then
                 printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
                 do! sleeper |> Async.AwaitTask
-                return! getNotificationsFrom recurse httpRequest markNotificationsAsRead lastModified releasesHandler
+
+                return!
+                    getNotificationsFrom recurse buildHttpRequest markNotificationsAsRead lastModified releasesHandler
             else
                 return Unchecked.defaultof<_>
         else if response.statusCode = Net.HttpStatusCode.OK then
@@ -134,7 +136,9 @@ let rec getNotificationsFrom
             if recurse then
                 printfn "%A Waiting until next poll at %A" (DateTime.Now) nextPollAt
                 do! sleeper |> Async.AwaitTask
-                return! getNotificationsFrom recurse httpRequest markNotificationsAsRead lastModified releasesHandler
+
+                return!
+                    getNotificationsFrom recurse buildHttpRequest markNotificationsAsRead lastModified releasesHandler
             else
                 return Unchecked.defaultof<_>
         else
@@ -148,7 +152,7 @@ let getNotifications
     (lastModified: DateTimeOffset option)
     (releasesHandler: System.Text.Json.JsonElement -> System.Threading.Tasks.Task<unit>)
     =
-    let httpRequest =
+    let buildHttpRequest (lastModifiedOption: DateTimeOffset option) : IToRequest =
         http {
             GET "https://api.github.com/notifications"
             Accept "application/vnd.github+json"
@@ -158,7 +162,7 @@ let getNotifications
             //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
             header
                 "If-Modified-Since"
-                (lastModified
+                (lastModifiedOption
                  |> Option.map (fun offset -> offset.DateTime |> HttpRequestHeaders.IfModifiedSince)
                  |> Option.map (fun (_h, v) -> v)
                  |> Option.defaultValue (DateTime.Parse("2020-01-01") |> HttpRequestHeaders.IfModifiedSince |> snd)
@@ -169,7 +173,7 @@ let getNotifications
 
     let recurse = true
 
-    getNotificationsFrom recurse httpRequest markNotificationsReadUntil lastModified releasesHandler
+    getNotificationsFrom recurse buildHttpRequest markNotificationsReadUntil lastModified releasesHandler
 
 let main handler =
     async {

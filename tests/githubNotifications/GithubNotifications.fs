@@ -10,7 +10,7 @@ open Suave.Filters
 open Suave.Writers
 open Suave.Successful
 open GithubNotifications
-
+open System
 open NUnit.Framework
 open NUnit
 open FsUnit
@@ -126,7 +126,8 @@ let test_getNotificationsFrom () =
                       path "/not_modified" >=> (fun ctx -> Suave.Redirection.NOT_MODIFIED ctx) ]
             |> serve
 
-        let httpRequest = http { GET(url "/notifications") }
+        let httpRequest: System.DateTimeOffset option -> IToRequest =
+            fun _ -> http { GET(url "/notifications") }
         // We don't mark notificationas as read i nour tests
         let markAsRead = fun _ -> async { return () }
         let lastModified = None
@@ -164,7 +165,9 @@ let test_getNotificationsFrom () =
                "registering release mason-registry/mason-org" |]
 
 
-        let notModifiedRequest = http { GET(url "/not_modified") }
+        let notModifiedRequest: DateTimeOffset option -> IToRequest =
+            fun _ -> http { GET(url "/not_modified") }
+
         let mutable acc = [||]
         // Handler accumulating in the array
         let releasesHandler (json: System.Text.Json.JsonElement) =
@@ -236,7 +239,7 @@ let test_getNotificationsFromWithLastModifiedHeader () =
             |> FSharp.Data.HttpRequestHeaders.IfModifiedSince
             |> snd
 
-        let httpRequest =
+        let httpRequest (lastModified: DateTimeOffset option) : IToRequest =
             http {
                 GET(url "/with_if_modified")
 
