@@ -17,6 +17,12 @@ module Queue =
     //let mutable cachedContext: Map<string, INatsJSContext> = Map.empty
     let mutable cachedStream: Map<string, INatsJSStream> = Map.empty
 
+    let queueFetchTimout =
+        System.Environment.GetEnvironmentVariable("QUEUE_FETCH_TIMEOUT_SECONDS")
+        |> Option.ofObj
+        |> Option.map int
+        |> Option.defaultValue 1
+
     let getContext () =
         match cachedContext with
         | Some v -> v
@@ -129,7 +135,9 @@ module Queue =
                 consumer.Info.NumPending
 
             do!
-                consumer.FetchAsync<string>(opts = new NatsJSFetchOpts(MaxMsgs = 1, Expires = TimeSpan.FromSeconds(1)))
+                consumer.FetchAsync<string>(
+                    opts = new NatsJSFetchOpts(MaxMsgs = 1, Expires = TimeSpan.FromSeconds(queueFetchTimout))
+                )
                 |> TaskSeq.iter (fun jmsg ->
                     try
 
@@ -162,7 +170,9 @@ module Queue =
                 consumer.Info.NumPending
 
             do!
-                consumer.FetchAsync<string>(opts = new NatsJSFetchOpts(MaxMsgs = 1, Expires = TimeSpan.FromSeconds(1)))
+                consumer.FetchAsync<string>(
+                    opts = new NatsJSFetchOpts(MaxMsgs = 1, Expires = TimeSpan.FromSeconds(queueFetchTimout))
+                )
                 |> TaskSeq.iter (fun jmsg ->
 
                     jmsg.Metadata
