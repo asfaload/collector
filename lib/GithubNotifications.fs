@@ -51,7 +51,7 @@ let getAndPersistLastModifiedFromResponseOrFile (response: Response) (fileLocati
                 None
 
 let markNotificationsReadUntil (lastModified: DateTimeOffset) =
-    printfn "will mark notifications as read"
+    printfn "will mark notifications as read until %A" lastModified
 
     async {
         let! response =
