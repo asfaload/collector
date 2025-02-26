@@ -312,10 +312,13 @@ module ChecksumsCollector =
             let relativeDownloadDir = getDownloadDir lastUri.Host downloadSegments
             let downloadDir = Path.Combine(baseDir, relativeDownloadDir)
 
+            if r.checksums |> List.length = 0 then
+                printfn "FIXME: No checksum was found for release though checksums download was requested"
+                return [||]
             // Check if the download directory already exists. If that's the case, it means
             // we look at a release we have already handled in the past, so we immediately return
             // an empty array, signaling no checksum was downloaded
-            if Directory.Exists downloadDir then
+            else if Directory.Exists downloadDir then
                 printfn "download dir %s exists, we already have downloaded thes checksums" downloadDir
                 return [||]
             else
