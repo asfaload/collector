@@ -56,7 +56,7 @@ let markNotificationsReadUntil (lastModified: DateTimeOffset) =
     async {
         let! response =
             http {
-                GET "https://api.github.com/notifications"
+                PUT "https://api.github.com/notifications"
                 Accept "application/vnd.github+json"
                 UserAgent "rbauduin-test"
                 AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
