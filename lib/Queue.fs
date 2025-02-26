@@ -46,7 +46,7 @@ module Queue =
                         new StreamConfig(
                             streamName,
                             subjects = subjects,
-                            Retention = StreamConfigRetention.Limits,
+                            Retention = StreamConfigRetention.Workqueue,
                             MaxAge = TimeSpan.FromDays(1)
                         )
                     )
