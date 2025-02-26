@@ -129,7 +129,6 @@ let test_getNotificationsFrom () =
         let httpRequest = http { GET(url "/notifications") }
         // We don't mark notificationas as read i nour tests
         let markAsRead = fun _ -> async { return () }
-        // FIXME: Add test with lastModified set
         let lastModified = None
 
         // We will accumulate the projects we have a notification from in this array
@@ -182,4 +181,85 @@ let test_getNotificationsFrom () =
 
         // Check the accumulator was updated accordingly
         acc |> should equal [||]
+    }
+
+[<Test>]
+let test_getNotificationsFromWithLastModifiedHeader () =
+    async {
+        let markAsRead = fun _ -> async { return () }
+
+        let mutable acc = [||]
+
+        let releasesHandler (json: System.Text.Json.JsonElement) =
+            task {
+
+                for release in (json.EnumerateArray()) do
+                    let user = (release?repository?owner?login.ToString())
+                    let repo = (release?repository?name.ToString())
+                    acc <- Array.append acc [| sprintf "registering release %s/%s" repo user |]
+
+            }
+        // Taken from FsHttp tests
+        let headersToString =
+            List.sort
+            >> List.map (fun (key, value) -> $"{key}={value}".ToLower())
+            >> (fun h -> System.String.Join("&", h))
+        // Our server just returns the first page of the notifications (doesn't handle per page and page number)
+        let mutable ifModifiedSinceReceivedByServer = []
+
+        use _server =
+            GET
+            >=> choose
+                    [ path "/with_if_modified"
+                      >=> request (fun r ->
+                          let modified =
+                              r.headers
+                              |> List.filter (fun (k, _) ->
+                                  printfn "Got header %s" k
+                                  k.StartsWith("If-Modified-Since", System.StringComparison.OrdinalIgnoreCase))
+                              |> List.map (fun (_k, v) -> Some v)
+
+                          printfn "Setting ifModifiedReceivedByServer to %A" modified
+                          ifModifiedSinceReceivedByServer <- modified
+
+                          let json = System.IO.File.ReadAllText("fixtures/8pp_p1.json")
+                          OK json) ]
+            |> serve
+
+
+        let lastModified = Some System.DateTimeOffset.Now
+
+        let expectedHeader =
+            lastModified
+            |> Option.map (fun o -> o.DateTime)
+            |> Option.get
+            |> FSharp.Data.HttpRequestHeaders.IfModifiedSince
+            |> snd
+
+        let httpRequest =
+            http {
+                GET(url "/with_if_modified")
+
+                header
+                    "If-Modified-Since"
+                    //        (System.DateTime.Parse("2020-01-01")
+                    //         |> FSharp.Data.HttpRequestHeaders.IfModifiedSince
+                    //         |> snd)
+
+                    (lastModified
+                     |> Option.map (fun offset -> offset.DateTime |> FSharp.Data.HttpRequestHeaders.IfModifiedSince)
+                     |> Option.map (fun (_h, v) -> v)
+                     |> Option.defaultValue (
+                         System.DateTime.Parse("2020-01-01")
+                         |> FSharp.Data.HttpRequestHeaders.IfModifiedSince
+                         |> snd
+                     ))
+
+            }
+        // Call function
+        ifModifiedSinceReceivedByServer <- []
+        do! getNotificationsFrom false httpRequest markAsRead lastModified releasesHandler
+        ifModifiedSinceReceivedByServer |> should equal [ Some expectedHeader ]
+
+
     }
