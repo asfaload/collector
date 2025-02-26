@@ -158,11 +158,13 @@ let getNotifications
             //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"
             header
                 "If-Modified-Since"
-
                 (lastModified
                  |> Option.map (fun offset -> offset.DateTime |> HttpRequestHeaders.IfModifiedSince)
                  |> Option.map (fun (_h, v) -> v)
-                 |> Option.defaultValue (DateTime.Parse("2020-01-01") |> HttpRequestHeaders.IfModifiedSince |> snd))
+                 |> Option.defaultValue (DateTime.Parse("2020-01-01") |> HttpRequestHeaders.IfModifiedSince |> snd)
+                 |> (fun s ->
+                     printfn "Getting notifications modified since %s" s
+                     s))
         }
 
     let recurse = true
