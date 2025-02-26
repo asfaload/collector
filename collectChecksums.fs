@@ -24,11 +24,11 @@ let rec readQueue () =
 
         printfn "Start of readQueue"
 
-        //do!
-        //    Queue.consumeCallbackRelease (fun callbackBody ->
-        //        printfn "running callbackRelease %s" (callbackBody.Repository.FullName)
-        //        handleCallbackRelease callbackBody |> Async.RunSynchronously)
-        //    |> Async.AwaitTask
+        do!
+            Queue.consumeCallbackRelease (fun callbackBody ->
+                printfn "running callbackRelease %s" (callbackBody.Repository.FullName)
+                handleCallbackRelease callbackBody |> Async.RunSynchronously)
+            |> Async.AwaitTask
 
         do!
             Queue.consumeRepoReleases (fun repo ->
