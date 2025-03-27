@@ -5,6 +5,7 @@ open System.IO
 open FsHttp
 open FSharp.Data
 open System.Text.Json
+open Asfaload.Collector
 
 let last_modified_file =
     Environment.GetEnvironmentVariable("NOTIFICATIONS_LAST_MODIFIED_FILE")
@@ -58,7 +59,7 @@ let markNotificationsReadUntil (lastModified: DateTimeOffset) =
             http {
                 PUT "https://api.github.com/notifications"
                 Accept "application/vnd.github+json"
-                UserAgent "rbauduin-test"
+                UserAgent Config.githubUserAgent
                 AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
                 header "X-GitHub-Api-Version" "2022-11-28"
                 body
@@ -156,7 +157,7 @@ let getNotifications
         http {
             GET "https://api.github.com/notifications"
             Accept "application/vnd.github+json"
-            UserAgent "rbauduin-test"
+            UserAgent Config.githubUserAgent
             AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
             header "X-GitHub-Api-Version" "2022-11-28"
             //header "If-Modified-Since" "Mon, 30 Sep 2024 09:21:13 GMT"

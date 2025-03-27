@@ -4,6 +4,7 @@ open System
 open System.IO
 open FsHttp
 open System.Text.Json
+open Asfaload.Collector
 
 let last_modified_file =
     Environment.GetEnvironmentVariable("NOTIFICATIONS_LAST_MODIFIED_FILE")
@@ -25,7 +26,7 @@ let rec getEventsNumber (number: int) (eventHandler: System.Text.Json.JsonElemen
             http {
                 GET $"https://api.github.com/events?per_page={number}"
                 Accept "application/vnd.github+json"
-                UserAgent "asfaload-collector"
+                UserAgent Config.githubUserAgent
                 AuthorizationBearer(Environment.GetEnvironmentVariable("GITHUB_TOKEN"))
                 header "X-GitHub-Api-Version" "2022-11-28"
             }
