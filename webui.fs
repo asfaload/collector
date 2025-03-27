@@ -222,7 +222,8 @@ let app: WebPart =
                   | Choice2Of2 exc ->
                       printfn "%s:\n%s" (exc.Message) (exc.StackTrace)
                       return Suave.ServerErrors.INTERNAL_ERROR """{"status":"ERROR"} """
-              }))
+              }
+              |> Async.RunSynchronously))
           // Post with curl:
           // curl -X POST -d '{"user":"asfaload","repo":"asfald"}' https://collector.asfaload.com/v1/track_github_repo
           POST
