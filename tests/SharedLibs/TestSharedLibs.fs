@@ -84,6 +84,11 @@ let test_isIgnored () =
     |> should equal false
 
 
+    let regexps = [| @".*(?<!neovim)/neovim$" |]
+    isIgnored (Some <| (Seq.ofArray regexps)) "neovim/neovim" |> should equal false
+    isIgnored (Some <| (Seq.ofArray regexps)) "myname/neovim" |> should equal true
+
+
 [<Test>]
 let test_ignoreFromFile () =
 
