@@ -40,6 +40,7 @@ module ChecksumHelpers =
     let CHECKSUMS =
         [ "checksum.txt"
           "checksums.txt"
+          "shasum.txt"
           "SHASUMS256"
           "SHASUMS512"
           "sha256"
