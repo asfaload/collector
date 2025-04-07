@@ -245,7 +245,14 @@ let main () =
             // Close page and context for videos to be saved
             do! page.CloseAsync()
             do! context.CloseAsync()
-            printfn "Caught exception %s:\n%s" exc.Message exc.StackTrace
+
+            printfn
+                "Caught exception %s:\n%s\nInnex exception: %A \n%A"
+                exc.Message
+                exc.StackTrace
+                exc.InnerException
+                exc.InnerException.StackTrace
+
             return 1
     }
 
