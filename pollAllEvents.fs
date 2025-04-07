@@ -40,8 +40,15 @@ let githubEventHandler (targetNumber: int) (el: System.Text.Json.JsonElement) =
                     match! getReleasesForRepo fullRepoName with
                     | NoRelease -> printfn "No release found"
                     | NoChecksum -> printfn "Release found, but no checksum file was found"
-                    | Added -> printfn "Added, repo is now tracked"
-                    | Known -> printfn "Repo was already known"
+                    | HasChecksum ->
+                        printfn "***** https://github.com/%s has a release with checksums!" fullRepoName
+
+                        let! created = Repos.create user gitRepo |> Sqlite.run
+
+                        if created |> List.length = 0 then
+                            printfn "but %s/%s was already known" user gitRepo
+                        else
+                            printfn "and %s/%s has been added to sqlite" user gitRepo
                 else
                     printfn "-known-"
                     countKnownRepos <- countKnownRepos + 1

@@ -47,9 +47,8 @@ module ChecksumHelpers =
           "sha512" ]
 
     type AdditionStatus =
-        | Known
+        | HasChecksum
         | NoChecksum
-        | Added
         | NoRelease
 
     let checkChecksuminRelease (repo: string) (releaseId: int64) =
@@ -80,17 +79,7 @@ module ChecksumHelpers =
                         |> List.exists (fun chk -> Regex.IsMatch(a?name.ToString(), chk, RegexOptions.IgnoreCase)))
 
                 if hasChecksums then
-                    printfn "***** https://github.com/%s has a release with checksums!" repo
-                    let (user, repo) = repo.Split("/") |> fun a -> (a[0], a[1])
-
-                    let created = Repos.create user repo |> Sqlite.run |> Async.RunSynchronously
-
-                    if created |> List.length = 0 then
-                        printfn "but %s/%s was already known" user repo
-                        return Known
-                    else
-                        printfn "and %s/%s has been added to sqlite" user repo
-                        return Added
+                    return HasChecksum
 
                 else
                     //printfn "----- https://github.com/%s has a release without artifact!" repo
