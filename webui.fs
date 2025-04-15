@@ -134,7 +134,7 @@ let app: WebPart =
                   let res =
                       req["repo"]
                       |> Option.map (fun r -> r.Split("/") |> (fun a -> (a[0], a[1])))
-                      |> Option.map (fun (user, repo) ->
+                      |> Option.bind (fun (user, repo) ->
                           try
                               printfn "will create repo %s/%s" user repo
                               let created = Repos.create user repo |> Sqlite.run |> Async.RunSynchronously
@@ -146,13 +146,14 @@ let app: WebPart =
                               |> Async.RunSynchronously
 
                               printfn "Created = %A" created
-                              created
+                              Some created
                           with e ->
                               printfn "Exception inserting new repo: %s" e.Message
-                              [])
+                              None)
 
                   match res with
                   | Some [ r ] -> Successful.OK $"""Insert repo {sprintf "%A" r}<br/>{form}"""
+                  | Some [] -> Successful.OK $"""Repo was already known<br/>{form}"""
                   | _ -> Suave.ServerErrors.INTERNAL_ERROR $"An error occurred<br/>{form}"
               | _ -> Suave.RequestErrors.FORBIDDEN "Provide authentication code")
           POST
