@@ -247,14 +247,22 @@ let app: WebPart =
                       return
                           { status = "NO_CHECKSUM"
                             msg = "Release found, but no checksum file was found" }
-                  | Added ->
-                      return
-                          { status = "ADDED"
-                            msg = "Added, repo is now tracked" }
-                  | Known ->
-                      return
-                          { status = "KNOWN"
-                            msg = "Repo was already known" }
+                  | HasChecksum ->
+                      let created =
+                          Repos.create info.user info.repo |> Sqlite.run |> Async.RunSynchronously
+
+                      if created |> List.length > 0 then
+                          Asfaload.Collector.Queue.triggerRepoReleaseDownload info.user info.repo
+                          |> Async.AwaitTask
+                          |> Async.RunSynchronously
+
+                          return
+                              { status = "ADDED"
+                                msg = "Added, repo is now tracked" }
+                      else
+                          return
+                              { status = "KNOWN"
+                                msg = "Repo was known" }
               }
               |> Async.RunSynchronously))
 
