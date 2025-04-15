@@ -136,12 +136,16 @@ let app: WebPart =
                       |> Option.map (fun r -> r.Split("/") |> (fun a -> (a[0], a[1])))
                       |> Option.map (fun (user, repo) ->
                           try
+                              printfn "will create repo %s/%s" user repo
                               let created = Repos.create user repo |> Sqlite.run |> Async.RunSynchronously
+
+                              printfn "will trigger download of release"
 
                               Asfaload.Collector.Queue.triggerRepoReleaseDownload user repo
                               |> Async.AwaitTask
                               |> Async.RunSynchronously
 
+                              printfn "Created = %A" created
                               created
                           with e ->
                               printfn "Exception inserting new repo: %s" e.Message
