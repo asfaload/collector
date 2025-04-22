@@ -142,6 +142,7 @@ let test_downloadChecksums () =
         GET
         >=> choose
                 [ path "/get_checksums" >=> OK "checksums file content"
+                  path "/get_toobig" >=> OK(File.ReadAllText "fixtures/checksums_toobig.txt")
                   path "/error" >=> Suave.RequestErrors.NOT_FOUND "File not found" ]
         |> serve
 
@@ -167,6 +168,16 @@ let test_downloadChecksums () =
     let r = downloadChecksums errorURI tempDir
     r |> should equal None
 
+    // Checksums file too big
+    let tempDir = Directory.CreateTempSubdirectory().FullName
+    let expectedPath = Path.Combine(tempDir, "get_toobig")
+    File.Exists(expectedPath) |> should equal false
+    let r = downloadChecksums (System.Uri(url "/get_toobig")) tempDir
+    printfn "tempDir = %s" tempDir
+    // Too big file should result in a None
+    r |> should equal None
+    // File was deleted
+    File.Exists(expectedPath) |> should equal false
 
 [<Test>]
 let test_getDownloadDir () =
@@ -253,7 +264,11 @@ let test_downloadReleaseChecksums () =
                       path $"/{releasePath}/checksums_512.txt"
                       >=> OK(File.ReadAllText "fixtures/checksums.txt")
                       path $"/{releasePath}/checksums_1024.txt"
-                      >=> Suave.RequestErrors.NOT_FOUND "File not found" ]
+                      >=> Suave.RequestErrors.NOT_FOUND "File not found"
+                      // This is a file too big to be a checksums file,
+                      // and should be ignored
+                      path $"/{releasePath}/checksums_toobig.txt"
+                      >=> OK(File.ReadAllText "fixtures/checksums_toobig.txt") ]
             |> serve
 
         // Create new repo
@@ -266,11 +281,12 @@ let test_downloadReleaseChecksums () =
         let segments = fullUri.Segments
         let fileName = "checksums.txt"
 
+        // This is the info obrained after looking for checksums in the release
         let repo: Repo =
             { kind = Github
               user = "asfaload"
               repo = "asfald"
-              checksums = [ "checksums.txt"; "checksums_512.txt" ] }
+              checksums = [ "checksums.txt"; "checksums_512.txt"; "checksums_toobig.txt" ] }
 
         let publishedAt = Nullable<DateTimeOffset>(DateTimeOffset.Now.AddDays(-1))
         let! r = downloadReleaseChecksums baseDir (fullUri.ToString()) publishedAt repo
@@ -280,6 +296,8 @@ let test_downloadReleaseChecksums () =
             equal
             [| (Some $"{baseDir}/{host}/{releasePath}/checksums.txt")
                (Some $"{baseDir}/{host}/{releasePath}/checksums_512.txt")
+               // This None is the checksums file that was too big
+               None
                // The None is the return of the async generating the index file
                None |]
 

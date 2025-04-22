@@ -184,8 +184,15 @@ module ChecksumsCollector =
             // FIXME: we should also look at other successful status codes
             if response.statusCode = Net.HttpStatusCode.OK then
                 response |> Response.saveFile filePath
-                printfn "Saved checksums file"
-                Some filePath
+                let info = FileInfo(filePath)
+
+                if info.Length > 1024L * 1024L then
+                    printfn "File too big (%d bytes), ignoring it" info.Length
+                    File.Delete(filePath)
+                    None
+                else
+                    printfn "Saved checksums file"
+                    Some filePath
             else
                 printfn
                     "ERROR: download gave unexpected status code %A for url %s"

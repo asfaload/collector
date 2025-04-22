@@ -1,7 +1,9 @@
+fixtures/checksums_toobig.txt:
+	fallocate -l 1025K fixtures/checksums_toobig.txt
 # Set DEBUG=1 as there's some sleep in non-debug to limit
 # request rates sent to github
 test: export DEBUG=1
-test:
+test: fixtures/checksums_toobig.txt
 	dotnet test
 
 coverage.xml:
