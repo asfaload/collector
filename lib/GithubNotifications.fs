@@ -3,6 +3,7 @@ module GithubNotifications
 open System
 open System.IO
 open FsHttp
+open Rest
 open FSharp.Data
 open System.Text.Json
 open Asfaload.Collector
@@ -79,7 +80,7 @@ let rec getNotificationsFrom
     (buildHttpRequest: DateTimeOffset option -> IToRequest)
     (markNotificationsAsRead: DateTimeOffset -> Async<unit>)
     (lastModified: DateTimeOffset option)
-    (releasesHandler: System.Text.Json.JsonElement -> System.Threading.Tasks.Task<unit>)
+    (releasesHandler: Notification.NotificationData.Root -> System.Threading.Tasks.Task<unit>)
     =
     async {
 
@@ -127,7 +128,14 @@ let rec getNotificationsFrom
             printfn "Last-modified = %A" lastModified
             let s = response |> Response.toText
             let json = System.Text.Json.JsonDocument.Parse(s)
-            do! releasesHandler json.RootElement |> Async.AwaitTask
+
+            for notif in (json.RootElement.EnumerateArray()) do
+
+                let notificationData =
+                    (notif.ToString()) |> Rest.Notification.NotificationData.Parse
+
+                do! releasesHandler notificationData |> Async.AwaitTask
+
             // Now wait until poll interval is passed
             match lastModified with
             | Some dt -> do! markNotificationsAsRead dt
@@ -151,7 +159,7 @@ let rec getNotificationsFrom
 // It passes the right default parameters to another function, which can be more easily tested
 let getNotifications
     (lastModified: DateTimeOffset option)
-    (releasesHandler: System.Text.Json.JsonElement -> System.Threading.Tasks.Task<unit>)
+    (releasesHandler: Notification.NotificationData.Root -> System.Threading.Tasks.Task<unit>)
     =
     let buildHttpRequest (lastModifiedOption: DateTimeOffset option) : IToRequest =
         http {

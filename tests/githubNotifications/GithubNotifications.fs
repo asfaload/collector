@@ -136,13 +136,13 @@ let test_getNotificationsFrom () =
         let mutable acc = [||]
 
         // Handler accumulating in the array
-        let releasesHandler (json: System.Text.Json.JsonElement) =
+        let releasesHandler (release: Rest.Notification.NotificationData.Root) =
             task {
 
-                for release in (json.EnumerateArray()) do
-                    let user = (release?repository?owner?login.ToString())
-                    let repo = (release?repository?name.ToString())
-                    acc <- Array.append acc [| sprintf "registering release %s/%s" repo user |]
+                let repoElements = release.Repository.FullName.Split("/")
+                let user = repoElements[0]
+                let repo = repoElements[1]
+                acc <- Array.append acc [| sprintf "registering release %s/%s" repo user |]
 
             }
 
@@ -170,13 +170,13 @@ let test_getNotificationsFrom () =
 
         let mutable acc = [||]
         // Handler accumulating in the array
-        let releasesHandler (json: System.Text.Json.JsonElement) =
+        let releasesHandler (release: Rest.Notification.NotificationData.Root) =
             task {
 
-                for release in (json.EnumerateArray()) do
-                    let user = (release?repository?owner?login.ToString())
-                    let repo = (release?repository?name.ToString())
-                    acc <- Array.append acc [| sprintf "registering release %s/%s" repo user |]
+                let repoElements = release.Repository.FullName.Split("/")
+                let user = repoElements[0]
+                let repo = repoElements[1]
+                acc <- Array.append acc [| sprintf "registering release %s/%s" repo user |]
 
             }
         // Call function
@@ -193,13 +193,13 @@ let test_getNotificationsFromWithLastModifiedHeader () =
 
         let mutable acc = [||]
 
-        let releasesHandler (json: System.Text.Json.JsonElement) =
+        let releasesHandler (release: Rest.Notification.NotificationData.Root) =
             task {
 
-                for release in (json.EnumerateArray()) do
-                    let user = (release?repository?owner?login.ToString())
-                    let repo = (release?repository?name.ToString())
-                    acc <- Array.append acc [| sprintf "registering release %s/%s" repo user |]
+                let repoElements = release.Repository.FullName.Split("/")
+                let user = repoElements[0]
+                let repo = repoElements[1]
+                acc <- Array.append acc [| sprintf "registering release %s/%s" repo user |]
 
             }
         // Taken from FsHttp tests
